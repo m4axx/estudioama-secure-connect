@@ -1,0 +1,8 @@
+{
+  "name": "EstudioAMA Secure Connect",
+  "description": "High-security video conferencing platform for EstudioAMA, featuring forensic watermarking and shared meeting codes.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
