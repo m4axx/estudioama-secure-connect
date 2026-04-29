@@ -41,7 +41,7 @@ export const ParticipantTile: React.FC<ParticipantTileProps> = ({ roomName }) =>
       )}
 
       {/* Info Overlay */}
-      <div className="absolute bottom-6 left-6 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10 flex items-center gap-3 shadow-lg">
+      <div className="absolute bottom-3 left-3 md:bottom-6 md:left-6 bg-black/60 backdrop-blur-md px-2.5 py-1 md:px-3 md:py-1.5 rounded-xl border border-white/10 flex items-center gap-2 md:gap-3 shadow-lg">
         <div className={cn("w-2 h-2 rounded-full", p.isMicrophoneEnabled ? "bg-emerald-500" : "bg-red-500")} />
         <span className="text-xs font-bold text-white truncate max-w-[120px]">
           {p.identity} {p.isLocal && "(You)"}
