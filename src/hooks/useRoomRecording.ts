@@ -1,30 +1,32 @@
 import { useCallback, useRef, useState } from 'react';
 import { useLocalParticipant, useRemoteParticipants } from '@livekit/components-react';
 import { Track } from 'livekit-client';
-import { Muxer, ArrayBufferTarget } from 'mp4-muxer';
 
-const SAMPLE_RATE = 48000;
-const NUM_CHANNELS = 2;
-const AUDIO_BITRATE = 128_000;
-const WIDTH = 1280;
-const HEIGHT = 720;
+const W = 1280;
+const H = 720;
 const FPS = 25;
-const VIDEO_BITRATE = 2_500_000;
+
+function chooseMime() {
+  const candidates = [
+    'video/mp4;codecs=avc1,mp4a.40.2',
+    'video/mp4',
+    'video/webm;codecs=vp9,opus',
+    'video/webm;codecs=vp8,opus',
+    'video/webm',
+  ];
+  return candidates.find((t) => MediaRecorder.isTypeSupported(t)) ?? 'video/webm';
+}
 
 export function useRoomRecording(roomName: string) {
   const [recording, setRecording] = useState(false);
   const [duration, setDuration] = useState(0);
 
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const videoIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const audioEncoderRef = useRef<AudioEncoder | null>(null);
-  const videoEncoderRef = useRef<VideoEncoder | null>(null);
-  const muxerRef = useRef<Muxer<ArrayBufferTarget> | null>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
   const audioCtxRef = useRef<AudioContext | null>(null);
-  const processorRef = useRef<ScriptProcessorNode | null>(null);
-  const audioTimestampRef = useRef(0);
-  const videoFrameCountRef = useRef(0);
-  const videoElementsRef = useRef<HTMLVideoElement[]>([]);
+  const drawIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const videoEls = useRef<HTMLVideoElement[]>([]);
 
   const { localParticipant } = useLocalParticipant();
   const remoteParticipants = useRemoteParticipants();
@@ -32,191 +34,118 @@ export function useRoomRecording(roomName: string) {
   const startRecording = useCallback(async () => {
     if (recording) return;
 
-    // ── Muxer ───────────────────────────────────────────────────────────────
-    const muxer = new Muxer({
-      target: new ArrayBufferTarget(),
-      video: { codec: 'avc', width: WIDTH, height: HEIGHT },
-      audio: { codec: 'aac', numberOfChannels: NUM_CHANNELS, sampleRate: SAMPLE_RATE },
-      fastStart: 'in-memory',
-    });
-    muxerRef.current = muxer;
+    // ── Canvas compositor ─────────────────────────────────────────────────
+    const canvas = document.createElement('canvas');
+    canvas.width = W;
+    canvas.height = H;
+    const gfx = canvas.getContext('2d')!;
 
-    // ── Encoder de vídeo H.264 ───────────────────────────────────────────────
-    const videoEncoder = new VideoEncoder({
-      output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
-      error: (e) => console.error('[AMA Rec video]', e),
-    });
-    videoEncoder.configure({
-      codec: 'avc1.42001f',       // H.264 Baseline Level 3.1
-      width: WIDTH,
-      height: HEIGHT,
-      bitrate: VIDEO_BITRATE,
-      framerate: FPS,
-      latencyMode: 'quality',
-    });
-    videoEncoderRef.current = videoEncoder;
-    videoFrameCountRef.current = 0;
-
-    // ── Encoder de audio AAC ─────────────────────────────────────────────────
-    const audioEncoder = new AudioEncoder({
-      output: (chunk, meta) => muxer.addAudioChunk(chunk, meta),
-      error: (e) => console.error('[AMA Rec audio]', e),
-    });
-    audioEncoder.configure({
-      codec: 'mp4a.40.2',
-      numberOfChannels: NUM_CHANNELS,
-      sampleRate: SAMPLE_RATE,
-      bitrate: AUDIO_BITRATE,
-    });
-    audioEncoderRef.current = audioEncoder;
-    audioTimestampRef.current = 0;
-
-    // ── Audio: mezclar todas las pistas ──────────────────────────────────────
-    const ctx = new AudioContext({ sampleRate: SAMPLE_RATE });
-    audioCtxRef.current = ctx;
-    const merger = ctx.createChannelMerger(NUM_CHANNELS);
-
-    const connectAudio = (track: MediaStreamTrack) => {
-      ctx.createMediaStreamSource(new MediaStream([track])).connect(merger);
+    // Crear un <video> por cada pista de cámara
+    const makeVid = async (track: MediaStreamTrack) => {
+      const v = document.createElement('video');
+      v.autoplay = true;
+      v.muted = true;
+      v.playsInline = true;
+      v.srcObject = new MediaStream([track]);
+      await v.play().catch(() => {});
+      return v;
     };
 
-    const localMic = localParticipant
-      .getTrackPublication(Track.Source.Microphone)?.track?.mediaStreamTrack;
-    if (localMic) connectAudio(localMic);
+    const els: HTMLVideoElement[] = [];
 
-    for (const p of remoteParticipants) {
-      const t = p.getTrackPublication(Track.Source.Microphone)?.track?.mediaStreamTrack;
-      if (t) connectAudio(t);
-    }
-
-    const processor = ctx.createScriptProcessor(4096, NUM_CHANNELS, NUM_CHANNELS);
-    processorRef.current = processor;
-    processor.onaudioprocess = (e) => {
-      if (audioEncoder.state === 'closed') return;
-      const left = e.inputBuffer.getChannelData(0);
-      const right = e.inputBuffer.getChannelData(1);
-      const planar = new Float32Array(left.length * 2);
-      planar.set(left, 0);
-      planar.set(right, left.length);
-      const audioData = new AudioData({
-        format: 'f32-planar',
-        sampleRate: SAMPLE_RATE,
-        numberOfFrames: left.length,
-        numberOfChannels: NUM_CHANNELS,
-        timestamp: audioTimestampRef.current,
-        data: planar,
-      });
-      audioEncoder.encode(audioData);
-      audioData.close();
-      audioTimestampRef.current += Math.round((left.length / SAMPLE_RATE) * 1_000_000);
-    };
-    merger.connect(processor);
-    processor.connect(ctx.destination);
-
-    // ── Vídeo: crear elementos <video> para cada participante ────────────────
-    const videoElements: HTMLVideoElement[] = [];
-
-    const makeVideoEl = async (track: MediaStreamTrack) => {
-      const el = document.createElement('video');
-      el.autoplay = true;
-      el.muted = true;
-      el.playsInline = true;
-      el.width = WIDTH;
-      el.height = HEIGHT;
-      el.srcObject = new MediaStream([track]);
-      await el.play().catch(() => {});
-      videoElements.push(el);
-    };
-
-    const localCam = localParticipant
+    const localTrack = localParticipant
       .getTrackPublication(Track.Source.Camera)?.track?.mediaStreamTrack;
-    if (localCam) await makeVideoEl(localCam);
+    if (localTrack) els.push(await makeVid(localTrack));
 
     for (const p of remoteParticipants) {
       const t = p.getTrackPublication(Track.Source.Camera)?.track?.mediaStreamTrack;
-      if (t) await makeVideoEl(t);
+      if (t) els.push(await makeVid(t));
     }
-    videoElementsRef.current = videoElements;
-
-    // ── Canvas compositor ────────────────────────────────────────────────────
-    const canvas = document.createElement('canvas');
-    canvas.width = WIDTH;
-    canvas.height = HEIGHT;
-    const gfx = canvas.getContext('2d')!;
+    videoEls.current = els;
 
     const drawFrame = () => {
       gfx.fillStyle = '#1c1c1c';
-      gfx.fillRect(0, 0, WIDTH, HEIGHT);
-      const els = videoElementsRef.current;
-      if (els.length === 0) return;
-      const cols = els.length === 1 ? 1 : 2;
-      const rows = Math.ceil(els.length / cols);
-      const w = WIDTH / cols;
-      const h = HEIGHT / rows;
-      els.forEach((v, i) => {
-        gfx.drawImage(v, (i % cols) * w, Math.floor(i / cols) * h, w, h);
+      gfx.fillRect(0, 0, W, H);
+      const n = videoEls.current.length;
+      if (n === 0) return;
+      const cols = n === 1 ? 1 : 2;
+      const rows = Math.ceil(n / cols);
+      const w = W / cols;
+      const h = H / rows;
+      videoEls.current.forEach((v, i) => {
+        try { gfx.drawImage(v, (i % cols) * w, Math.floor(i / cols) * h, w, h); }
+        catch { /* frame no disponible aún */ }
       });
     };
 
-    // Loop de captura de frames
-    const intervalMs = 1000 / FPS;
-    videoIntervalRef.current = setInterval(() => {
-      if (videoEncoder.state === 'closed') return;
-      drawFrame();
-      const frame = new VideoFrame(canvas, {
-        timestamp: Math.round(videoFrameCountRef.current * (1_000_000 / FPS)),
-      });
-      const keyFrame = videoFrameCountRef.current % (FPS * 2) === 0;
-      videoEncoder.encode(frame, { keyFrame });
-      frame.close();
-      videoFrameCountRef.current++;
-    }, intervalMs);
+    // Pintar primer frame y arrancar loop
+    drawFrame();
+    drawIntervalRef.current = setInterval(drawFrame, 1000 / FPS);
+
+    // ── Audio: mezclar todas las pistas ───────────────────────────────────
+    const audioCtx = new AudioContext();
+    audioCtxRef.current = audioCtx;
+    const dest = audioCtx.createMediaStreamDestination();
+
+    const connectMic = (track: MediaStreamTrack) =>
+      audioCtx.createMediaStreamSource(new MediaStream([track])).connect(dest);
+
+    const localMic = localParticipant
+      .getTrackPublication(Track.Source.Microphone)?.track?.mediaStreamTrack;
+    if (localMic) connectMic(localMic);
+    for (const p of remoteParticipants) {
+      const t = p.getTrackPublication(Track.Source.Microphone)?.track?.mediaStreamTrack;
+      if (t) connectMic(t);
+    }
+
+    // ── Stream combinado: canvas vídeo + audio mezclado ───────────────────
+    const combined = new MediaStream([
+      ...canvas.captureStream(FPS).getVideoTracks(),
+      ...dest.stream.getAudioTracks(),
+    ]);
+
+    // ── MediaRecorder ─────────────────────────────────────────────────────
+    const mimeType = chooseMime();
+    const ext = mimeType.startsWith('video/mp4') ? 'mp4' : 'webm';
+    const recorder = new MediaRecorder(combined, { mimeType });
+    chunksRef.current = [];
+
+    recorder.ondataavailable = (e) => {
+      if (e.data.size > 0) chunksRef.current.push(e.data);
+    };
+
+    recorder.onstop = () => {
+      const blob = new Blob(chunksRef.current, { type: mimeType });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const date = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      a.href = url;
+      a.download = `AMA-sesion-${roomName}-${date}.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    };
+
+    recorder.start(1000);
+    recorderRef.current = recorder;
 
     setRecording(true);
     setDuration(0);
     timerRef.current = setInterval(() => setDuration((d) => d + 1), 1000);
   }, [recording, localParticipant, remoteParticipants, roomName]);
 
-  const stopRecording = useCallback(async () => {
-    if (!videoEncoderRef.current || !audioEncoderRef.current || !muxerRef.current) return;
-
-    // Parar bucles
-    if (videoIntervalRef.current) clearInterval(videoIntervalRef.current);
+  const stopRecording = useCallback(() => {
+    recorderRef.current?.stop();
+    if (drawIntervalRef.current) clearInterval(drawIntervalRef.current);
     if (timerRef.current) clearInterval(timerRef.current);
-    processorRef.current?.disconnect();
-
-    // Flush y cerrar encoders
-    await videoEncoderRef.current.flush();
-    videoEncoderRef.current.close();
-    await audioEncoderRef.current.flush();
-    audioEncoderRef.current.close();
-
-    // Finalizar muxer y descargar
-    muxerRef.current.finalize();
-    const { buffer } = muxerRef.current.target;
     audioCtxRef.current?.close();
-
-    // Limpiar elementos de vídeo
-    videoElementsRef.current.forEach((v) => { v.srcObject = null; });
-    videoElementsRef.current = [];
-
-    const blob = new Blob([buffer], { type: 'video/mp4' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    const date = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    a.href = url;
-    a.download = `AMA-sesion-${roomName}-${date}.mp4`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-
+    videoEls.current.forEach((v) => { v.srcObject = null; });
+    videoEls.current = [];
+    recorderRef.current = null;
     setRecording(false);
     setDuration(0);
-    videoEncoderRef.current = null;
-    audioEncoderRef.current = null;
-    muxerRef.current = null;
-  }, [roomName]);
+  }, []);
 
   const fmt = (s: number) =>
     `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`;
