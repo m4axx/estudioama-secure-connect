@@ -30,13 +30,13 @@ export const Controls: React.FC<ControlsProps> = ({ onToggleChat, showChat, isOr
 
   const toggleFullscreen = useCallback(() => {
     const el = document.documentElement as any;
-    if (!document.fullscreenElement) {
-      // Android Chrome: requestFullscreen. iOS Safari: webkitRequestFullscreen.
+    const isFs = !!(document.fullscreenElement || (document as any).webkitFullscreenElement);
+    if (!isFs) {
       const req = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen;
-      if (req) req.call(el).then(() => setIsFullscreen(true)).catch(() => {});
+      if (req) { try { const p = req.call(el); p?.catch?.(() => {}); } catch (_) {} }
     } else {
       const exit = (document as any).exitFullscreen || (document as any).webkitExitFullscreen;
-      if (exit) exit.call(document).then(() => setIsFullscreen(false)).catch(() => {});
+      if (exit) { try { const p = exit.call(document); p?.catch?.(() => {}); } catch (_) {} }
     }
   }, []);
 
