@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   LiveKitRoom,
+  RoomAudioRenderer,
   useTracks,
   TrackRefContext,
   ParticipantContext
@@ -300,6 +301,9 @@ export const CallRoom: React.FC<CallRoomProps> = ({
           roomName={roomName}
         />
       </div>
+
+      {/* Reproduce automáticamente el audio de todos los participantes remotos */}
+      <RoomAudioRenderer />
     </LiveKitRoom>
   );
 };
