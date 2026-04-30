@@ -24,6 +24,7 @@ interface CallRoomProps {
   wsUrl: string;
   roomName: string;
   username: string;
+  isOrganizer: boolean;
   onDisconnect: () => void;
   onKicked: (reason: KickReason) => void;
 }
@@ -33,6 +34,7 @@ export const CallRoom: React.FC<CallRoomProps> = ({
   wsUrl,
   roomName,
   username,
+  isOrganizer,
   onDisconnect,
   onKicked
 }) => {
@@ -294,6 +296,8 @@ export const CallRoom: React.FC<CallRoomProps> = ({
           onToggleParticipants={() => setShowParticipants(!showParticipants)}
           showChat={showChat}
           showParticipants={showParticipants}
+          isOrganizer={isOrganizer}
+          roomName={roomName}
         />
       </div>
     </LiveKitRoom>

@@ -49,6 +49,7 @@ export default function App() {
   const [wsUrl, setWsUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [configError, setConfigError] = useState<null | { apiKey: boolean, apiSecret: boolean, wsUrl: boolean }>(null);
+  const [isOrganizer, setIsOrganizer] = useState(false);
 
   const generateMeetingCode = () => {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -58,6 +59,7 @@ export default function App() {
       code += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     setRoomName(code);
+    setIsOrganizer(true);
     toast.success("Código de sesión generado");
   };
 
@@ -115,6 +117,7 @@ export default function App() {
     setKicked(reason);
     setToken('');
     setWsUrl('');
+    setIsOrganizer(false);
   };
 
   // ── Pantalla de expulsión ──
@@ -162,7 +165,8 @@ export default function App() {
           wsUrl={wsUrl}
           roomName={roomName}
           username={username}
-          onDisconnect={() => { setInCall(false); setToken(''); setWsUrl(''); }}
+          isOrganizer={isOrganizer}
+          onDisconnect={() => { setInCall(false); setToken(''); setWsUrl(''); setIsOrganizer(false); }}
           onKicked={handleKicked}
         />
         <Toaster position="bottom-right" />

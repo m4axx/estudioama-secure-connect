@@ -10,7 +10,8 @@ import {
   Video, VideoOff,
   Monitor,
   MessageSquare,
-  Maximize, Minimize
+  Maximize, Minimize,
+  Circle, StopCircle
 } from 'lucide-react';
 import { Button, buttonVariants } from './ui/button';
 import {
@@ -20,19 +21,25 @@ import {
   TooltipTrigger
 } from './ui/tooltip';
 import { cn } from '@/lib/utils';
+import { useRoomRecording } from '@/hooks/useRoomRecording';
 
 interface ControlsProps {
   onToggleChat: () => void;
   onToggleParticipants: () => void;
   showChat: boolean;
   showParticipants: boolean;
+  isOrganizer: boolean;
+  roomName: string;
 }
 
 export const Controls: React.FC<ControlsProps> = ({
   onToggleChat,
   showChat,
+  isOrganizer,
+  roomName,
 }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const { recording, duration, startRecording, stopRecording } = useRoomRecording(roomName);
 
   const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
@@ -52,7 +59,7 @@ export const Controls: React.FC<ControlsProps> = ({
     <TooltipProvider>
       <div className="bg-[#fffefe] border border-[#1c1c1c]/10 rounded-[32px] px-5 md:px-8 py-3 md:py-4 flex items-center justify-between shadow-sm">
 
-        {/* Controles de micrófono y cámara */}
+        {/* Micrófono y cámara */}
         <div className="flex gap-4 md:gap-5">
           <ControlButton Icon={Mic} ActiveIcon={MicOff} label="Micrófono" source={Track.Source.Microphone} />
           <ControlButton Icon={Video} ActiveIcon={VideoOff} label="Cámara" source={Track.Source.Camera} />
@@ -115,14 +122,48 @@ export const Controls: React.FC<ControlsProps> = ({
             </TooltipTrigger>
             <TooltipContent>{isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}</TooltipContent>
           </Tooltip>
+
+          {/* Grabación — solo visible para el organizador */}
+          {isOrganizer && (
+            <Tooltip>
+              <TooltipTrigger
+                className={cn(
+                  buttonVariants({ variant: "ghost", size: "icon" }),
+                  "rounded-xl w-9 h-9 md:w-10 md:h-10 transition-all",
+                  recording
+                    ? "bg-[#8d3030]/10 text-[#8d3030] hover:bg-[#8d3030]/15"
+                    : "text-[#1c1c1c]/40 hover:text-[#1c1c1c] hover:bg-[#1c1c1c]/6"
+                )}
+                onClick={recording ? stopRecording : startRecording}
+              >
+                {recording
+                  ? <StopCircle className="w-4 h-4 md:w-5 md:h-5" />
+                  : <Circle className="w-4 h-4 md:w-5 md:h-5" />
+                }
+              </TooltipTrigger>
+              <TooltipContent>
+                {recording ? `Detener grabación (${duration})` : "Iniciar grabación"}
+              </TooltipContent>
+            </Tooltip>
+          )}
         </div>
 
-        {/* Estado + salir */}
+        {/* Estado + indicador de grabación + salir */}
         <div className="flex items-center gap-3 md:gap-5">
-          <div className="text-right hidden sm:block">
-            <p className="text-[9px] text-[#1c1c1c]/35 font-bold uppercase tracking-widest">Estado</p>
-            <p className="text-xs font-mono text-emerald-600 uppercase font-black">Seguro</p>
-          </div>
+          {recording ? (
+            <div className="hidden sm:flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-[#8d3030] animate-pulse" />
+              <span className="text-xs font-mono font-bold text-[#8d3030] uppercase tracking-widest">
+                {duration}
+              </span>
+            </div>
+          ) : (
+            <div className="text-right hidden sm:block">
+              <p className="text-[9px] text-[#1c1c1c]/35 font-bold uppercase tracking-widest">Estado</p>
+              <p className="text-xs font-mono text-emerald-600 uppercase font-black">Seguro</p>
+            </div>
+          )}
+
           <DisconnectButton
             className={cn(
               buttonVariants({ variant: "default" }),
@@ -139,10 +180,6 @@ export const Controls: React.FC<ControlsProps> = ({
   );
 };
 
-// ── Botón de pista (micrófono / cámara) ──────────────────────────────────────
-// Los iconos van como children del TooltipTrigger, no dentro del render prop.
-// Base UI hace cloneElement sobre el render prop y pasaría children:undefined
-// si los iconos estuvieran dentro — eso rompería tanto el icono como el toggle.
 function ControlButton({ Icon, ActiveIcon, label, source }: {
   Icon: React.ElementType;
   ActiveIcon: React.ElementType;
