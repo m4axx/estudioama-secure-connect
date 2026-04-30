@@ -40,9 +40,13 @@ export function useRoomRecording(roomName: string) {
 
     audioCtxRef.current = ctx;
 
-    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-      ? 'audio/webm;codecs=opus'
-      : 'audio/webm';
+    const mimeType = MediaRecorder.isTypeSupported('audio/mp4')
+      ? 'audio/mp4'
+      : MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : 'audio/webm';
+
+    const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
 
     const recorder = new MediaRecorder(dest.stream, { mimeType });
     chunksRef.current = [];
@@ -57,7 +61,7 @@ export function useRoomRecording(roomName: string) {
       const a = document.createElement('a');
       const date = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
       a.href = url;
-      a.download = `AMA-sesion-${roomName}-${date}.webm`;
+      a.download = `AMA-sesion-${roomName}-${date}.${ext}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
