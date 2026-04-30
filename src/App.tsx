@@ -24,6 +24,7 @@ function Logo({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
         src="/logo/AMA.png"
         alt="EstudioAMA"
         className={sizes[size].img}
+        style={{ mixBlendMode: 'multiply' }}
         onError={(e) => {
           e.currentTarget.style.display = 'none';
           const fb = e.currentTarget.nextElementSibling as HTMLElement | null;

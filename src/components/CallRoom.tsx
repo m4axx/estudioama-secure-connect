@@ -142,6 +142,7 @@ export const CallRoom: React.FC<CallRoomProps> = ({
             src="/logo/AMA.png"
             alt="EstudioAMA"
             className="h-7 md:h-8"
+            style={{ mixBlendMode: 'multiply' }}
             onError={(e) => {
               e.currentTarget.style.display = 'none';
               const fb = e.currentTarget.nextElementSibling as HTMLElement | null;

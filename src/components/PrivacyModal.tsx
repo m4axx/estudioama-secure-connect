@@ -27,6 +27,7 @@ export const PrivacyModal: React.FC<PrivacyModalProps> = ({ roomName, onAccept, 
               src="/logo/AMA.png"
               alt="EstudioAMA"
               className="h-8"
+              style={{ mixBlendMode: 'multiply' }}
               onError={(e) => {
                 e.currentTarget.style.display = 'none';
                 const fb = e.currentTarget.nextElementSibling as HTMLElement | null;
