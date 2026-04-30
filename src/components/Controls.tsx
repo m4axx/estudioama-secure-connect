@@ -82,7 +82,10 @@ export const Controls: React.FC<ControlsProps> = ({ onToggleChat, showChat, isOr
                 <TrackToggle
                   source={Track.Source.ScreenShare}
                   showIcon={false}
-                  captureOptions={{ audio: true }}
+                  captureOptions={{
+                    audio: true,
+                    resolution: { width: 3840, height: 2160, frameRate: 30 },
+                  }}
                   className={cn(BTN, SIZE, IDLE, 'hidden md:flex border-none bg-transparent')}
                 />
               }
