@@ -91,7 +91,12 @@ export default function App() {
 
       setToken(data.token);
       setWsUrl(data.wsUrl);
-      setShowPrivacyModal(true);
+      // El organizador entra directamente, los invitados deben aceptar políticas
+      if (isOrganizer) {
+        setInCall(true);
+      } else {
+        setShowPrivacyModal(true);
+      }
     } catch (err) {
       console.error(err);
       toast.error("Error de conexión");
