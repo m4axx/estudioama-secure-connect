@@ -29,17 +29,27 @@ export const Controls: React.FC<ControlsProps> = ({ onToggleChat, showChat, isOr
   const { recording, duration, startRecording, stopRecording } = useRoomRecording(roomName);
 
   const toggleFullscreen = useCallback(() => {
+    const el = document.documentElement as any;
     if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => {});
+      // Android Chrome: requestFullscreen. iOS Safari: webkitRequestFullscreen.
+      const req = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen;
+      if (req) req.call(el).then(() => setIsFullscreen(true)).catch(() => {});
     } else {
-      document.exitFullscreen().then(() => setIsFullscreen(false)).catch(() => {});
+      const exit = (document as any).exitFullscreen || (document as any).webkitExitFullscreen;
+      if (exit) exit.call(document).then(() => setIsFullscreen(false)).catch(() => {});
     }
   }, []);
 
   React.useEffect(() => {
-    const h = () => setIsFullscreen(!!document.fullscreenElement);
+    const h = () => setIsFullscreen(
+      !!(document.fullscreenElement || (document as any).webkitFullscreenElement)
+    );
     document.addEventListener('fullscreenchange', h);
-    return () => document.removeEventListener('fullscreenchange', h);
+    document.addEventListener('webkitfullscreenchange', h);
+    return () => {
+      document.removeEventListener('fullscreenchange', h);
+      document.removeEventListener('webkitfullscreenchange', h);
+    };
   }, []);
 
   return (

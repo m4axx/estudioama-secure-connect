@@ -320,7 +320,13 @@ export default function App() {
                       placeholder="XXX-XXX-XXX"
                       className="bg-[#f8f5f0] border-[#1c1c1c]/10 pl-11 h-13 rounded-2xl focus-visible:ring-[#8d3030]/30 focus-visible:border-[#8d3030]/40 text-[#1c1c1c] font-mono uppercase text-center tracking-[0.2em] placeholder:text-[#1c1c1c]/25"
                       value={roomName}
-                      onChange={(e) => setRoomName(e.target.value.toUpperCase())}
+                      onChange={(e) => {
+                        const raw = e.target.value.replace(/[^A-Z0-9]/gi, '').toUpperCase().slice(0, 9);
+                        let fmt = raw;
+                        if (raw.length > 6) fmt = raw.slice(0,3) + '-' + raw.slice(3,6) + '-' + raw.slice(6);
+                        else if (raw.length > 3) fmt = raw.slice(0,3) + '-' + raw.slice(3);
+                        setRoomName(fmt);
+                      }}
                     />
                   </div>
                 </div>
