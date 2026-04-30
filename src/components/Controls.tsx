@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   DisconnectButton,
   TrackToggle,
@@ -10,7 +10,7 @@ import {
   Video, VideoOff,
   Monitor,
   MessageSquare,
-  Settings
+  Maximize, Minimize
 } from 'lucide-react';
 import { Button, buttonVariants } from './ui/button';
 import {
@@ -30,14 +30,29 @@ interface ControlsProps {
 
 export const Controls: React.FC<ControlsProps> = ({
   onToggleChat,
-  onToggleParticipants,
   showChat,
-  showParticipants
 }) => {
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  const toggleFullscreen = useCallback(() => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => {});
+    } else {
+      document.exitFullscreen().then(() => setIsFullscreen(false)).catch(() => {});
+    }
+  }, []);
+
+  React.useEffect(() => {
+    const handler = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', handler);
+    return () => document.removeEventListener('fullscreenchange', handler);
+  }, []);
+
   return (
     <TooltipProvider>
       <div className="bg-[#fffefe] border border-[#1c1c1c]/10 rounded-[32px] px-5 md:px-8 py-3 md:py-4 flex items-center justify-between shadow-sm">
-        {/* Controles principales */}
+
+        {/* Controles de micrófono y cámara */}
         <div className="flex gap-4 md:gap-5">
           <ControlButton Icon={Mic} ActiveIcon={MicOff} label="Micrófono" source={Track.Source.Microphone} />
           <ControlButton Icon={Video} ActiveIcon={VideoOff} label="Cámara" source={Track.Source.Camera} />
@@ -45,6 +60,8 @@ export const Controls: React.FC<ControlsProps> = ({
 
         {/* Controles secundarios */}
         <div className="flex gap-1.5 md:gap-2 items-center bg-[#f8f5f0] px-3 md:px-4 py-2 rounded-2xl border border-[#1c1c1c]/8">
+
+          {/* Chat */}
           <Tooltip>
             <TooltipTrigger
               className={cn(
@@ -61,6 +78,7 @@ export const Controls: React.FC<ControlsProps> = ({
             <TooltipContent>Chat de sesión</TooltipContent>
           </Tooltip>
 
+          {/* Compartir pantalla */}
           <Tooltip>
             <TooltipTrigger
               render={
@@ -69,23 +87,34 @@ export const Controls: React.FC<ControlsProps> = ({
                   showIcon={false}
                   className={cn(
                     buttonVariants({ variant: "ghost", size: "icon" }),
-                    "rounded-xl w-9 h-9 md:w-10 md:h-10 text-[#1c1c1c]/40 hover:text-[#1c1c1c] hover:bg-[#1c1c1c]/6 border-none bg-transparent hidden md:flex"
+                    "rounded-xl w-9 h-9 md:w-10 md:h-10 border-none bg-transparent hidden md:flex",
+                    "text-[#1c1c1c]/40 hover:text-[#1c1c1c] hover:bg-[#1c1c1c]/6"
                   )}
-                >
-                  <Monitor className="w-5 h-5" />
-                </TrackToggle>
+                />
               }
-            />
+            >
+              <Monitor className="w-4 h-4 md:w-5 md:h-5" />
+            </TooltipTrigger>
             <TooltipContent>Compartir pantalla</TooltipContent>
           </Tooltip>
 
-          <Button
-            variant="ghost"
-            size="icon"
-            className="rounded-xl w-9 h-9 md:w-10 md:h-10 text-[#1c1c1c]/40 hover:text-[#1c1c1c] hover:bg-[#1c1c1c]/6 hidden md:flex"
-          >
-            <Settings className="w-5 h-5" />
-          </Button>
+          {/* Pantalla completa */}
+          <Tooltip>
+            <TooltipTrigger
+              className={cn(
+                buttonVariants({ variant: "ghost", size: "icon" }),
+                "rounded-xl w-9 h-9 md:w-10 md:h-10 transition-all",
+                "text-[#1c1c1c]/40 hover:text-[#1c1c1c] hover:bg-[#1c1c1c]/6"
+              )}
+              onClick={toggleFullscreen}
+            >
+              {isFullscreen
+                ? <Minimize className="w-4 h-4 md:w-5 md:h-5" />
+                : <Maximize className="w-4 h-4 md:w-5 md:h-5" />
+              }
+            </TooltipTrigger>
+            <TooltipContent>{isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}</TooltipContent>
+          </Tooltip>
         </div>
 
         {/* Estado + salir */}
@@ -104,16 +133,21 @@ export const Controls: React.FC<ControlsProps> = ({
             <span className="sm:hidden">Salir</span>
           </DisconnectButton>
         </div>
+
       </div>
     </TooltipProvider>
   );
 };
 
+// ── Botón de pista (micrófono / cámara) ──────────────────────────────────────
+// Los iconos van como children del TooltipTrigger, no dentro del render prop.
+// Base UI hace cloneElement sobre el render prop y pasaría children:undefined
+// si los iconos estuvieran dentro — eso rompería tanto el icono como el toggle.
 function ControlButton({ Icon, ActiveIcon, label, source }: {
   Icon: React.ElementType;
   ActiveIcon: React.ElementType;
   label: string;
-  source: any;
+  source: Track.Source;
 }) {
   return (
     <div className="flex flex-col items-center gap-1">
@@ -124,18 +158,20 @@ function ControlButton({ Icon, ActiveIcon, label, source }: {
               source={source}
               showIcon={false}
               className={cn(
-                "w-11 h-11 md:w-13 md:h-13 rounded-2xl transition-all border flex items-center justify-center",
+                "w-11 h-11 md:w-12 md:h-12 rounded-2xl transition-all border flex items-center justify-center",
                 "bg-[#f8f5f0] border-[#1c1c1c]/10 text-[#1c1c1c]/60 hover:bg-[#1c1c1c]/6 hover:text-[#1c1c1c]",
                 "aria-[pressed=true]:bg-[#8d3030]/8 aria-[pressed=true]:text-[#8d3030] aria-[pressed=true]:border-[#8d3030]/20"
               )}
-            >
-              <TrackStatusIcon Icon={Icon} ActiveIcon={ActiveIcon} source={source} />
-            </TrackToggle>
+            />
           }
-        />
+        >
+          <TrackStatusIcon Icon={Icon} ActiveIcon={ActiveIcon} source={source} />
+        </TooltipTrigger>
         <TooltipContent>{label}</TooltipContent>
       </Tooltip>
-      <span className="text-[8px] font-bold text-[#1c1c1c]/30 uppercase tracking-tighter hidden md:block">{label}</span>
+      <span className="text-[8px] font-bold text-[#1c1c1c]/30 uppercase tracking-tighter hidden md:block">
+        {label}
+      </span>
     </div>
   );
 }
@@ -143,7 +179,7 @@ function ControlButton({ Icon, ActiveIcon, label, source }: {
 function TrackStatusIcon({ Icon, ActiveIcon, source }: {
   Icon: React.ElementType;
   ActiveIcon: React.ElementType;
-  source: any;
+  source: Track.Source;
 }) {
   const { isMicrophoneEnabled, isCameraEnabled } = useLocalParticipant();
   const enabled = source === Track.Source.Microphone ? isMicrophoneEnabled : isCameraEnabled;
