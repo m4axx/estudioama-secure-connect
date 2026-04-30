@@ -62,28 +62,49 @@ export const CallRoom: React.FC<CallRoomProps> = ({
   };
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const isPrintScreen = e.key === 'PrintScreen';
-      const isCtrlShiftS = e.ctrlKey && e.shiftKey && e.key === 'S';
-      const isMacShot = e.metaKey && e.shiftKey && (e.key === '3' || e.key === '4' || e.key === '5');
-      const isCtrlPrintScreen = e.ctrlKey && e.key === 'PrintScreen';
-      const isAltPrintScreen = e.altKey && e.key === 'PrintScreen';
-      const isWindowsSnip = e.metaKey && e.shiftKey && e.key === 'S';
+    const isScreenshotKey = (e: KeyboardEvent) =>
+      e.key === 'PrintScreen' ||
+      (e.ctrlKey && e.key === 'PrintScreen') ||
+      (e.altKey && e.key === 'PrintScreen') ||
+      // macOS: Cmd+Shift+3/4/5
+      (e.metaKey && e.shiftKey && ['3', '4', '5'].includes(e.key));
 
-      if (isPrintScreen || isCtrlShiftS || isMacShot || isCtrlPrintScreen || isAltPrintScreen || isWindowsSnip) {
+    // keydown: bloquea lo que el navegador puede interceptar y muestra overlay
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (isScreenshotKey(e)) {
         e.preventDefault();
+        triggerKick();
+      }
+    };
+
+    // keyup: PrintScreen en Windows llega aquí aunque el OS lo intercepte en keydown
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (isScreenshotKey(e)) {
         triggerKick();
       }
     };
 
     const handleContextMenu = (e: MouseEvent) => e.preventDefault();
 
+    // visibilitychange: al volver desde una app de captura externa la pestaña
+    // pasa brevemente a hidden; se registra pero no se expulsa (falsos positivos)
+    const handleVisibility = () => {
+      if (document.hidden) {
+        // solo log — Win+Shift+S y herramientas externas no son detectables con certeza
+        console.warn('[AMA Security] Visibility hidden — possible external capture');
+      }
+    };
+
     document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('keyup', handleKeyUp);
     document.addEventListener('contextmenu', handleContextMenu);
+    document.addEventListener('visibilitychange', handleVisibility);
 
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keyup', handleKeyUp);
       document.removeEventListener('contextmenu', handleContextMenu);
+      document.removeEventListener('visibilitychange', handleVisibility);
       if (countdownRef.current) clearInterval(countdownRef.current);
     };
   }, []);
