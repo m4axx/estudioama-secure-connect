@@ -12,6 +12,32 @@ import "@livekit/components-styles";
 
 type KickReason = 'screenshot' | null;
 
+function Logo({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
+  const sizes = {
+    sm: { img: 'h-7', text: 'text-lg' },
+    md: { img: 'h-9', text: 'text-2xl' },
+    lg: { img: 'h-14', text: 'text-5xl' },
+  };
+  return (
+    <div className="flex items-center">
+      <img
+        src="/logo/AMA.png"
+        alt="EstudioAMA"
+        className={sizes[size].img}
+        onError={(e) => {
+          e.currentTarget.style.display = 'none';
+          const fb = e.currentTarget.nextElementSibling as HTMLElement | null;
+          if (fb) fb.hidden = false;
+        }}
+      />
+      <span hidden className={`font-black tracking-tighter leading-none ${sizes[size].text}`}>
+        <span className="text-[#1c1c1c]">ESTUDIO</span>
+        <span className="text-[#8d3030]">AMA</span>
+      </span>
+    </div>
+  );
+}
+
 export default function App() {
   const [inCall, setInCall] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
@@ -31,13 +57,13 @@ export default function App() {
       code += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     setRoomName(code);
-    toast.success("Meeting code generated!");
+    toast.success("Código de sesión generado");
   };
 
   const joinMeeting = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!roomName || !username) {
-      toast.error("Please enter a meeting code and your name");
+      toast.error("Introduce el código de sesión y tu nombre");
       return;
     }
 
@@ -53,7 +79,7 @@ export default function App() {
       if (data.error) {
         if (data.configured) {
           setConfigError(data.configured);
-          toast.error("LiveKit configuration error");
+          toast.error("Error de configuración LiveKit");
         } else {
           toast.error(data.error);
         }
@@ -62,11 +88,10 @@ export default function App() {
 
       setToken(data.token);
       setWsUrl(data.wsUrl);
-      // Show privacy modal before entering the call
       setShowPrivacyModal(true);
     } catch (err) {
       console.error(err);
-      toast.error("Connection failed");
+      toast.error("Error de conexión");
     } finally {
       setLoading(false);
     }
@@ -81,7 +106,7 @@ export default function App() {
     setShowPrivacyModal(false);
     setToken('');
     setWsUrl('');
-    toast.error("Debes aceptar las políticas para unirte.");
+    toast.error("Debes aceptar las políticas para continuar.");
   };
 
   const handleKicked = (reason: KickReason) => {
@@ -91,44 +116,46 @@ export default function App() {
     setWsUrl('');
   };
 
-  // ── Kicked screen ──
+  // ── Pantalla de expulsión ──
   if (kicked === 'screenshot') {
     return (
-      <div className="min-h-screen bg-[#050505] flex items-center justify-center p-6">
+      <div className="min-h-screen bg-[#f8f5f0] flex items-center justify-center p-6">
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           className="max-w-sm w-full text-center"
         >
-          <div className="w-20 h-20 bg-red-600/10 border border-red-600/30 rounded-full flex items-center justify-center mx-auto mb-6">
-            <AlertTriangle className="w-10 h-10 text-red-500" />
+          <div className="w-20 h-20 bg-[#8d3030]/8 border border-[#8d3030]/20 rounded-full flex items-center justify-center mx-auto mb-6">
+            <AlertTriangle className="w-9 h-9 text-[#8d3030]" />
           </div>
-          <h2 className="text-2xl font-black text-white tracking-tight mb-3">
-            Expulsado de la sesión
+          <h2 className="text-2xl font-black text-[#1c1c1c] tracking-tight mb-3">
+            Sesión interrumpida
           </h2>
-          <p className="text-slate-400 text-sm leading-relaxed mb-2">
+          <p className="text-[#1c1c1c]/60 text-sm leading-relaxed mb-2">
             Se detectó un intento de captura de pantalla.
           </p>
-          <p className="text-slate-600 text-xs leading-relaxed mb-8">
-            Por políticas de privacidad de <span className="text-red-500 font-bold">EstudioAMA</span>, las capturas de pantalla y grabaciones están estrictamente prohibidas. Este incidente ha sido registrado.
+          <p className="text-[#1c1c1c]/35 text-xs leading-relaxed mb-10">
+            Por las políticas de privacidad de{' '}
+            <span className="text-[#8d3030] font-bold">EstudioAMA</span>, las capturas y grabaciones están
+            estrictamente prohibidas. Este incidente ha sido registrado.
           </p>
           <Button
             onClick={() => { setKicked(null); setRoomName(''); setUsername(''); }}
             variant="ghost"
-            className="text-slate-500 hover:text-white text-xs uppercase tracking-widest border border-slate-800 rounded-2xl px-6 py-3 h-auto"
+            className="text-[#1c1c1c]/50 hover:text-[#1c1c1c] text-xs uppercase tracking-widest border border-[#1c1c1c]/12 rounded-2xl px-6 py-3 h-auto bg-white hover:bg-white"
           >
             Volver al inicio
           </Button>
         </motion.div>
-        <Toaster position="bottom-right" theme="dark" />
+        <Toaster position="bottom-right" />
       </div>
     );
   }
 
-  // ── In call ──
+  // ── En llamada ──
   if (inCall && token && wsUrl) {
     return (
-      <div className="h-screen w-full bg-black">
+      <div className="h-screen w-full bg-[#1c1c1c]">
         <CallRoom
           token={token}
           wsUrl={wsUrl}
@@ -137,15 +164,14 @@ export default function App() {
           onDisconnect={() => { setInCall(false); setToken(''); setWsUrl(''); }}
           onKicked={handleKicked}
         />
-        <Toaster position="bottom-right" theme="dark" />
+        <Toaster position="bottom-right" />
       </div>
     );
   }
 
-  // ── Landing page ──
+  // ── Landing ──
   return (
-    <div className="min-h-screen bg-[#050505] font-sans selection:bg-red-500/30 overflow-x-hidden text-slate-200">
-      {/* Privacy modal shown after token is fetched */}
+    <div className="min-h-screen bg-[#f8f5f0] font-sans selection:bg-[#8d3030]/20 overflow-x-hidden text-[#1c1c1c]">
       {showPrivacyModal && (
         <PrivacyModal
           roomName={roomName}
@@ -154,64 +180,90 @@ export default function App() {
         />
       )}
 
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(220,38,38,0.1),transparent_50%)]" />
+      {/* Fondo geométrico arquitectónico */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-[#fffefe] rounded-full blur-3xl opacity-60 translate-x-1/3 -translate-y-1/3" />
+        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-[#8d3030]/4 rounded-full blur-3xl" />
+        {/* Grid de puntos */}
+        <svg className="absolute inset-0 w-full h-full opacity-[0.035]" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <pattern id="dots" x="0" y="0" width="32" height="32" patternUnits="userSpaceOnUse">
+              <circle cx="1" cy="1" r="1" fill="#1c1c1c" />
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#dots)" />
+        </svg>
+      </div>
 
-      <div className="relative z-10 max-w-7xl mx-auto px-6 pt-20 pb-32">
-        <nav className="flex items-center justify-between mb-24">
-          <div className="flex items-center gap-4">
-            <div className="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center font-bold text-white shadow-lg shadow-red-500/20 italic">A</div>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tighter text-white leading-none">Estudio<span className="text-red-500 font-black">AMA</span></h1>
-              <div className="flex items-center gap-2 mt-1">
-                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
-                <p className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">Secure Encryption Active</p>
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-6">
-            <Button variant="ghost" className="text-white hover:text-red-500 text-xs uppercase tracking-widest font-bold opacity-60 hover:opacity-100 transition-opacity">
-              Security protocol
-            </Button>
+      <div className="relative z-10 max-w-7xl mx-auto px-6 pt-10 pb-24">
+        {/* Nav */}
+        <nav className="flex items-center justify-between mb-20">
+          <Logo size="md" />
+          <div className="flex items-center gap-2 bg-[#fffefe]/80 border border-[#1c1c1c]/8 px-4 py-2 rounded-full shadow-sm">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <p className="text-[10px] text-[#1c1c1c]/50 uppercase tracking-widest font-semibold">Cifrado activo</p>
           </div>
         </nav>
 
         <div className="grid lg:grid-cols-2 gap-16 items-center">
+          {/* Hero */}
           <div>
-            <motion.h1
-              initial={{ opacity: 0, y: 20 }}
+            <motion.div
+              initial={{ opacity: 0, y: 24 }}
               animate={{ opacity: 1, y: 0 }}
-              className="text-6xl md:text-7xl font-bold text-white leading-[1.1] mb-8 tracking-tighter"
+              className="inline-flex items-center gap-2 bg-[#8d3030]/8 border border-[#8d3030]/15 px-4 py-1.5 rounded-full mb-8"
             >
-              Estudio<span className="text-red-600 font-black">AMA</span> <br />
-              <span className="text-white/20">Secure.</span>
+              <ShieldCheck className="w-3.5 h-3.5 text-[#8d3030]" />
+              <span className="text-[10px] font-bold text-[#8d3030] uppercase tracking-widest">Plataforma privada</span>
+            </motion.div>
+
+            <motion.h1
+              initial={{ opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.05 }}
+              className="text-5xl md:text-6xl lg:text-7xl font-black text-[#1c1c1c] leading-[1.0] mb-6 tracking-tighter"
+            >
+              Sesiones<br />
+              <span className="text-[#8d3030]">seguras</span><br />
+              <span className="text-[#1c1c1c]/20">para AMA.</span>
             </motion.h1>
+
             <motion.p
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 24 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
-              className="text-lg text-slate-400 mb-10 max-w-lg leading-relaxed"
+              className="text-base text-[#1c1c1c]/55 mb-10 max-w-md leading-relaxed"
             >
-              Enterprise-grade conferencing with forensic anti-recording protection.
-              Private channels for <span className="text-red-500 font-bold">EstudioAMA</span> critical sessions.
+              Videoconferencia con cifrado de extremo a extremo y protección
+              anti-grabación para las sesiones críticas de{' '}
+              <span className="text-[#8d3030] font-semibold">EstudioAMA</span>.
             </motion.p>
 
-            <div className="flex flex-col sm:flex-row gap-4">
-              <Button onClick={() => document.getElementById('meeting-card')?.scrollIntoView({ behavior: 'smooth' })} size="lg" className="bg-red-600 hover:bg-red-700 text-white rounded-full px-8 h-14 text-base font-semibold group transition-all hover:scale-105 active:scale-95 shadow-lg shadow-red-500/20">
-                Join Meeting <ChevronRight className="ml-1 w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            <motion.div
+              initial={{ opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.15 }}
+            >
+              <Button
+                onClick={() => document.getElementById('meeting-card')?.scrollIntoView({ behavior: 'smooth' })}
+                size="lg"
+                className="bg-[#1c1c1c] hover:bg-[#1c1c1c]/85 text-white rounded-full px-8 h-13 text-sm font-semibold group transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-[#1c1c1c]/12 border-none"
+              >
+                Unirse a una sesión <ChevronRight className="ml-1 w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </Button>
-            </div>
+            </motion.div>
 
             <AnimatePresence>
               {configError && (
                 <motion.div
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="mt-8 p-4 bg-red-500/10 border border-red-500/20 rounded-[24px] flex gap-3"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-8 p-4 bg-[#8d3030]/6 border border-[#8d3030]/15 rounded-2xl flex gap-3"
                 >
-                  <AlertCircle className="text-red-500 w-5 h-5 flex-shrink-0 mt-0.5" />
+                  <AlertCircle className="text-[#8d3030] w-5 h-5 flex-shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-red-300 font-bold text-sm mb-1 uppercase tracking-tight">Configuration Required</p>
-                    <div className="mt-2 flex gap-2 flex-wrap">
+                    <p className="text-[#8d3030] font-bold text-sm mb-2 uppercase tracking-tight">Configuración requerida</p>
+                    <div className="flex gap-2 flex-wrap">
                       <StatusBadge label="API_KEY" active={configError.apiKey} />
                       <StatusBadge label="API_SECRET" active={configError.apiSecret} />
                       <StatusBadge label="URL" active={configError.wsUrl} />
@@ -222,51 +274,54 @@ export default function App() {
             </AnimatePresence>
           </div>
 
+          {/* Card de acceso */}
           <motion.div
             id="meeting-card"
-            initial={{ opacity: 0, x: 50 }}
+            initial={{ opacity: 0, x: 40 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.2 }}
           >
-            <Card className="bg-slate-900/40 border-slate-800 backdrop-blur-3xl shadow-2xl rounded-[32px] overflow-hidden border">
-              <CardHeader>
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-2 h-2 rounded-full bg-red-500"></div>
-                  <span className="text-[10px] text-slate-500 font-mono tracking-widest uppercase font-bold">Secure Access Gate</span>
+            <Card className="bg-[#fffefe] border border-[#1c1c1c]/8 shadow-[0_8px_48px_rgba(28,28,28,0.08)] rounded-[32px] overflow-hidden">
+              <CardHeader className="pb-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Lock className="w-3.5 h-3.5 text-[#8d3030]" />
+                  <span className="text-[10px] text-[#1c1c1c]/40 font-mono tracking-widest uppercase font-bold">Acceso seguro</span>
                 </div>
-                <CardTitle className="text-2xl text-white">Enter Meeting Code</CardTitle>
-                <CardDescription className="text-slate-500">
-                  Provide the shared alphanumeric identity to connect.
+                <CardTitle className="text-xl text-[#1c1c1c] font-black tracking-tight">Código de sesión</CardTitle>
+                <CardDescription className="text-[#1c1c1c]/45 text-sm">
+                  Introduce el código alfanumérico compartido por tu equipo.
                 </CardDescription>
               </CardHeader>
+
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <div className="flex justify-between items-end">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Meeting Code</label>
+                    <label className="text-[10px] font-bold text-[#1c1c1c]/40 uppercase tracking-wider">Código</label>
                     <button
                       onClick={generateMeetingCode}
-                      className="text-[10px] font-bold text-red-500 hover:text-red-400 uppercase tracking-wider transition-colors"
+                      className="text-[10px] font-bold text-[#8d3030] hover:text-[#8d3030]/70 uppercase tracking-wider transition-colors"
                     >
-                      Generate New Code
+                      Generar nuevo código
                     </button>
                   </div>
                   <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600" />
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#1c1c1c]/25" />
                     <Input
                       placeholder="XXX-XXX-XXX"
-                      className="bg-[#050505] border-slate-800 pl-10 h-14 rounded-2xl focus-visible:ring-red-600 text-white font-mono uppercase text-center tracking-[0.2em]"
+                      className="bg-[#f8f5f0] border-[#1c1c1c]/10 pl-11 h-13 rounded-2xl focus-visible:ring-[#8d3030]/30 focus-visible:border-[#8d3030]/40 text-[#1c1c1c] font-mono uppercase text-center tracking-[0.2em] placeholder:text-[#1c1c1c]/25"
                       value={roomName}
                       onChange={(e) => setRoomName(e.target.value.toUpperCase())}
                     />
                   </div>
                 </div>
+
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Your Identity</label>
+                  <label className="text-[10px] font-bold text-[#1c1c1c]/40 uppercase tracking-wider">Tu nombre</label>
                   <div className="relative">
-                    <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600" />
+                    <Users className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#1c1c1c]/25" />
                     <Input
-                      placeholder="Your Name"
-                      className="bg-[#050505] border-slate-800 pl-10 h-14 rounded-2xl focus-visible:ring-red-600 text-white"
+                      placeholder="Nombre completo"
+                      className="bg-[#f8f5f0] border-[#1c1c1c]/10 pl-11 h-13 rounded-2xl focus-visible:ring-[#8d3030]/30 focus-visible:border-[#8d3030]/40 text-[#1c1c1c] placeholder:text-[#1c1c1c]/25"
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && joinMeeting()}
@@ -274,44 +329,48 @@ export default function App() {
                   </div>
                 </div>
               </CardContent>
+
               <CardFooter>
                 <Button
                   onClick={() => joinMeeting()}
                   disabled={loading}
-                  className="w-full h-14 bg-red-600 hover:bg-red-700 text-white font-bold text-base rounded-2xl transition-all shadow-lg shadow-red-500/20 active:scale-95 disabled:opacity-50 border-none"
+                  className="w-full h-13 bg-[#8d3030] hover:bg-[#7a2828] text-white font-bold text-sm rounded-2xl transition-all shadow-md shadow-[#8d3030]/15 active:scale-[0.98] disabled:opacity-40 border-none"
                 >
-                  {loading ? "Authenticating..." : "Establish Connection"}
+                  {loading ? "Autenticando..." : "Establecer conexión"}
                 </Button>
               </CardFooter>
-              <div className="px-6 pb-6 text-center">
-                <p className="text-[10px] text-slate-600 flex items-center justify-center gap-1.5 uppercase font-bold tracking-tighter">
-                  <ShieldCheck className="w-3 h-3 text-red-500" />
-                  EstudioAMA Private Mesh Active
+
+              <div className="px-6 pb-5 text-center">
+                <p className="text-[9px] text-[#1c1c1c]/25 flex items-center justify-center gap-1.5 uppercase font-bold tracking-wider">
+                  <ShieldCheck className="w-3 h-3 text-[#8d3030]/50" />
+                  Malla privada EstudioAMA activa
                 </p>
               </div>
             </Card>
           </motion.div>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-8 mt-32 border-t border-slate-900 pt-16">
+        {/* Features */}
+        <div className="grid md:grid-cols-3 gap-8 mt-28 border-t border-[#1c1c1c]/8 pt-16">
           <Feature
-            icon={<ShieldCheck className="w-6 h-6 text-red-500" />}
-            title="Sovereign Privacy"
-            desc="End-to-end encrypted tunnels designed specifically for EstudioAMA internal communications."
+            icon={<ShieldCheck className="w-5 h-5 text-[#8d3030]" />}
+            title="Privacidad soberana"
+            desc="Canales cifrados de extremo a extremo diseñados exclusivamente para comunicaciones internas de EstudioAMA."
           />
           <Feature
-            icon={<Video className="w-6 h-6 text-red-500" />}
-            title="High Fidelity"
-            desc="Uncompressed video streams for architectural review and digital design collaboration."
+            icon={<Video className="w-5 h-5 text-[#8d3030]" />}
+            title="Alta fidelidad"
+            desc="Vídeo sin comprimir para revisión de proyectos arquitectónicos y colaboración en diseño digital."
           />
           <Feature
-            icon={<Users className="w-6 h-6 text-red-500" />}
-            title="Audit Ready"
-            desc="Every session includes permanent forensic markers for compliance and security tracing."
+            icon={<Users className="w-5 h-5 text-[#8d3030]" />}
+            title="Listo para auditoría"
+            desc="Cada sesión incluye marcas forenses permanentes para trazabilidad de seguridad y cumplimiento normativo."
           />
         </div>
       </div>
-      <Toaster position="bottom-right" theme="dark" />
+
+      <Toaster position="bottom-right" />
     </div>
   );
 }
@@ -319,19 +378,19 @@ export default function App() {
 function Feature({ icon, title, desc }: { icon: React.ReactNode, title: string, desc: string }) {
   return (
     <div className="flex flex-col gap-4">
-      <div className="w-12 h-12 bg-neutral-900 rounded-xl flex items-center justify-center ring-1 ring-neutral-800">
+      <div className="w-11 h-11 bg-[#fffefe] border border-[#1c1c1c]/8 rounded-xl flex items-center justify-center shadow-sm">
         {icon}
       </div>
-      <h3 className="text-lg font-bold text-white">{title}</h3>
-      <p className="text-neutral-500 text-sm leading-relaxed">{desc}</p>
+      <h3 className="text-base font-bold text-[#1c1c1c]">{title}</h3>
+      <p className="text-[#1c1c1c]/45 text-sm leading-relaxed">{desc}</p>
     </div>
   );
 }
 
 function StatusBadge({ label, active }: { label: string, active: boolean }) {
   return (
-    <div className={`px-1.5 py-0.5 rounded text-[9px] font-mono flex items-center gap-1 border ${active ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-red-500/10 border-red-500/30 text-red-400'}`}>
-      <div className={`w-1 h-1 rounded-full ${active ? 'bg-green-500' : 'bg-red-500'}`} />
+    <div className={`px-2 py-0.5 rounded text-[9px] font-mono flex items-center gap-1 border ${active ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-[#8d3030]/5 border-[#8d3030]/20 text-[#8d3030]'}`}>
+      <div className={`w-1 h-1 rounded-full ${active ? 'bg-emerald-500' : 'bg-[#8d3030]'}`} />
       {label}
     </div>
   );

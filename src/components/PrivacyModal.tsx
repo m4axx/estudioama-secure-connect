@@ -13,56 +13,67 @@ export const PrivacyModal: React.FC<PrivacyModalProps> = ({ roomName, onAccept, 
   const [checked, setChecked] = useState(false);
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
+    <div className="fixed inset-0 z-[100] bg-[#1c1c1c]/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
       <motion.div
         initial={{ opacity: 0, y: 50 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-        className="w-full max-w-md bg-[#0c0d0f] border border-slate-800 rounded-[32px] overflow-hidden shadow-2xl"
+        className="w-full max-w-md bg-[#fffefe] border border-[#1c1c1c]/10 rounded-[32px] overflow-hidden shadow-[0_24px_80px_rgba(28,28,28,0.18)]"
       >
-        {/* Header */}
-        <div className="bg-gradient-to-r from-red-950/60 to-transparent border-b border-red-900/30 px-6 py-5 flex items-center gap-4">
-          <div className="w-11 h-11 bg-red-600 rounded-xl flex items-center justify-center font-black text-white italic text-lg shadow-lg shadow-red-500/30 flex-shrink-0">
-            A
+        {/* Cabecera */}
+        <div className="bg-[#f8f5f0] border-b border-[#1c1c1c]/8 px-6 py-5 flex items-center gap-4">
+          <div className="flex items-center">
+            <img
+              src="/logo/AMA.png"
+              alt="EstudioAMA"
+              className="h-8"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+                const fb = e.currentTarget.nextElementSibling as HTMLElement | null;
+                if (fb) fb.hidden = false;
+              }}
+            />
+            <span hidden className="font-black tracking-tighter text-xl leading-none">
+              <span className="text-[#1c1c1c]">ESTUDIO</span>
+              <span className="text-[#8d3030]">AMA</span>
+            </span>
           </div>
-          <div>
-            <p className="text-white font-bold text-sm leading-none">EstudioAMA</p>
-            <p className="text-red-400 text-[10px] uppercase tracking-widest font-bold mt-1">
-              Aviso de privacidad y confidencialidad
-            </p>
-          </div>
+          <div className="h-6 w-px bg-[#1c1c1c]/12" />
+          <p className="text-[#8d3030] text-[10px] uppercase tracking-widest font-bold">
+            Aviso de privacidad y confidencialidad
+          </p>
         </div>
 
-        {/* Body */}
+        {/* Cuerpo */}
         <div className="px-6 py-5 space-y-4">
-          <p className="text-slate-300 text-sm leading-relaxed">
+          <p className="text-[#1c1c1c]/70 text-sm leading-relaxed">
             Estás a punto de unirte a la sesión{' '}
-            <span className="text-white font-bold font-mono bg-slate-800 px-1.5 py-0.5 rounded-lg text-xs">
+            <span className="text-[#1c1c1c] font-bold font-mono bg-[#f8f5f0] px-2 py-0.5 rounded-lg text-xs border border-[#1c1c1c]/10">
               {roomName}
             </span>
-            . Esta sesión es <strong className="text-white">privada y confidencial</strong>.
+            . Esta sesión es <strong className="text-[#1c1c1c]">privada y confidencial</strong>.
           </p>
 
-          {/* Policy list */}
-          <div className="space-y-2.5 bg-slate-900/60 rounded-2xl p-4 border border-slate-800/80">
+          {/* Lista de políticas */}
+          <div className="space-y-2.5 bg-[#f8f5f0] rounded-2xl p-4 border border-[#1c1c1c]/8">
             <PolicyItem
-              icon={<Camera className="w-4 h-4 text-red-500" />}
+              icon={<Camera className="w-4 h-4 text-[#8d3030]" />}
               text="Queda estrictamente prohibido realizar capturas de pantalla."
             />
             <PolicyItem
-              icon={<Monitor className="w-4 h-4 text-red-500" />}
+              icon={<Monitor className="w-4 h-4 text-[#8d3030]" />}
               text="Queda estrictamente prohibido grabar la pantalla o el audio."
             />
             <PolicyItem
-              icon={<Eye className="w-4 h-4 text-red-500" />}
+              icon={<Eye className="w-4 h-4 text-[#8d3030]" />}
               text="Queda prohibido compartir o retransmitir el contenido de la sesión."
             />
             <PolicyItem
-              icon={<ShieldCheck className="w-4 h-4 text-emerald-500" />}
+              icon={<ShieldCheck className="w-4 h-4 text-emerald-600" />}
               text="Toda sesión incluye marcas forenses con tu identidad, código de sala y hora exacta."
             />
             <PolicyItem
-              icon={<AlertTriangle className="w-4 h-4 text-amber-500" />}
+              icon={<AlertTriangle className="w-4 h-4 text-amber-600" />}
               text="Cualquier intento de captura resultará en expulsión inmediata y podrá tener consecuencias legales."
             />
           </div>
@@ -73,8 +84,8 @@ export const PrivacyModal: React.FC<PrivacyModalProps> = ({ roomName, onAccept, 
               onClick={() => setChecked(!checked)}
               className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 mt-0.5 transition-all ${
                 checked
-                  ? 'bg-red-600 border-red-600'
-                  : 'border-slate-600 group-hover:border-slate-400'
+                  ? 'bg-[#8d3030] border-[#8d3030]'
+                  : 'border-[#1c1c1c]/25 group-hover:border-[#1c1c1c]/50'
               }`}
             >
               {checked && (
@@ -83,9 +94,9 @@ export const PrivacyModal: React.FC<PrivacyModalProps> = ({ roomName, onAccept, 
                 </svg>
               )}
             </div>
-            <span className="text-slate-400 text-xs leading-relaxed">
+            <span className="text-[#1c1c1c]/55 text-xs leading-relaxed">
               He leído y acepto las{' '}
-              <span className="text-red-400 font-semibold">
+              <span className="text-[#8d3030] font-semibold">
                 políticas de privacidad y confidencialidad de EstudioAMA
               </span>
               . Entiendo que el incumplimiento puede derivar en acciones legales.
@@ -93,19 +104,19 @@ export const PrivacyModal: React.FC<PrivacyModalProps> = ({ roomName, onAccept, 
           </label>
         </div>
 
-        {/* Actions */}
+        {/* Acciones */}
         <div className="px-6 pb-6 flex flex-col gap-2">
           <Button
             onClick={onAccept}
             disabled={!checked}
-            className="w-full h-12 bg-red-600 hover:bg-red-700 disabled:opacity-30 disabled:cursor-not-allowed text-white font-bold rounded-2xl border-none transition-all"
+            className="w-full h-12 bg-[#8d3030] hover:bg-[#7a2828] disabled:opacity-30 disabled:cursor-not-allowed text-white font-bold rounded-2xl border-none transition-all shadow-md shadow-[#8d3030]/15"
           >
             Acepto — Entrar a la sesión
           </Button>
           <Button
             onClick={onDecline}
             variant="ghost"
-            className="w-full h-10 text-slate-600 hover:text-slate-400 text-[11px] uppercase tracking-widest"
+            className="w-full h-10 text-[#1c1c1c]/35 hover:text-[#1c1c1c]/60 text-[11px] uppercase tracking-widest"
           >
             No acepto — cancelar
           </Button>
@@ -119,7 +130,7 @@ function PolicyItem({ icon, text }: { icon: React.ReactNode; text: string }) {
   return (
     <div className="flex items-start gap-3">
       <div className="flex-shrink-0 mt-0.5">{icon}</div>
-      <p className="text-slate-400 text-xs leading-relaxed">{text}</p>
+      <p className="text-[#1c1c1c]/60 text-xs leading-relaxed">{text}</p>
     </div>
   );
 }
