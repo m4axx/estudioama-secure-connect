@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   LiveKitRoom,
+  RoomAudioRenderer,
+  AudioTrack,
   useTracks,
   TrackRefContext,
   ParticipantContext
@@ -9,12 +11,7 @@ import { Track } from 'livekit-client';
 import { ParticipantTile } from './ParticipantTile';
 import { Controls } from './Controls';
 import { Chat } from './Chat';
-import {
-  ShieldCheck,
-  Users,
-  Lock,
-  AlertTriangle
-} from 'lucide-react';
+import { ShieldCheck, Users, Lock, AlertTriangle } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 
 type KickReason = 'screenshot' | null;
@@ -24,20 +21,15 @@ interface CallRoomProps {
   wsUrl: string;
   roomName: string;
   username: string;
+  isOrganizer: boolean;
   onDisconnect: () => void;
   onKicked: (reason: KickReason) => void;
 }
 
 export const CallRoom: React.FC<CallRoomProps> = ({
-  token,
-  wsUrl,
-  roomName,
-  username,
-  onDisconnect,
-  onKicked
+  token, wsUrl, roomName, username, isOrganizer, onDisconnect, onKicked,
 }) => {
   const [showChat, setShowChat] = useState(false);
-  const [showParticipants, setShowParticipants] = useState(false);
   const [showBlackout, setShowBlackout] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -48,278 +40,266 @@ export const CallRoom: React.FC<CallRoomProps> = ({
     kickingRef.current = true;
     setShowBlackout(true);
     setCountdown(3);
-
     let count = 3;
     countdownRef.current = setInterval(() => {
       count -= 1;
-      if (count <= 0) {
-        clearInterval(countdownRef.current!);
-        onKicked('screenshot');
-      } else {
-        setCountdown(count);
-      }
+      if (count <= 0) { clearInterval(countdownRef.current!); onKicked('screenshot'); }
+      else setCountdown(count);
     }, 1000);
   };
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const isPrintScreen = e.key === 'PrintScreen';
-      const isCtrlShiftS = e.ctrlKey && e.shiftKey && e.key === 'S';
-      const isMacShot =
-        e.metaKey && e.shiftKey && (e.key === '3' || e.key === '4' || e.key === '5');
-      const isCtrlPrintScreen = e.ctrlKey && e.key === 'PrintScreen';
-      const isAltPrintScreen = e.altKey && e.key === 'PrintScreen';
-      const isWindowsSnip = e.metaKey && e.shiftKey && e.key === 'S';
+    const isShot = (e: KeyboardEvent) =>
+      e.key === 'PrintScreen' ||
+      (e.ctrlKey && e.key === 'PrintScreen') ||
+      (e.altKey && e.key === 'PrintScreen') ||
+      (e.metaKey && e.shiftKey && ['3', '4', '5'].includes(e.key));
 
-      if (isPrintScreen || isCtrlShiftS || isMacShot || isCtrlPrintScreen || isAltPrintScreen || isWindowsSnip) {
-        e.preventDefault();
-        triggerKick();
-      }
-    };
+    const onDown = (e: KeyboardEvent) => { if (isShot(e)) { e.preventDefault(); triggerKick(); } };
+    const onUp   = (e: KeyboardEvent) => { if (isShot(e)) triggerKick(); };
+    const noCtx  = (e: MouseEvent)    => e.preventDefault();
 
-    const handleContextMenu = (e: MouseEvent) => {
-      e.preventDefault();
-    };
-
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        // briefly hidden could indicate screen recording app switching
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    document.addEventListener('contextmenu', handleContextMenu);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
+    document.addEventListener('keydown', onDown);
+    document.addEventListener('keyup', onUp);
+    document.addEventListener('contextmenu', noCtx);
     return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-      document.removeEventListener('contextmenu', handleContextMenu);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener('keydown', onDown);
+      document.removeEventListener('keyup', onUp);
+      document.removeEventListener('contextmenu', noCtx);
       if (countdownRef.current) clearInterval(countdownRef.current);
     };
   }, []);
 
   return (
     <LiveKitRoom
-      video={true}
-      audio={true}
-      token={token}
-      serverUrl={wsUrl}
-      onDisconnected={onDisconnect}
-      className="flex flex-col h-[100dvh] bg-[#050505] overflow-hidden selection:bg-indigo-500/30 font-sans"
+      video audio token={token} serverUrl={wsUrl} onDisconnected={onDisconnect}
+      className="flex flex-col h-[100dvh] bg-[#f8f5f0] overflow-hidden font-sans"
     >
-      {/* Anti-recording CSS */}
       <style>{`
-        .video-protected { position: relative; isolation: isolate; }
-        .video-protected::after {
-          content: '';
-          position: absolute;
-          inset: 0;
-          pointer-events: none;
-          -webkit-backdrop-filter: blur(0.001px);
-          backdrop-filter: blur(0.001px);
-          z-index: 1;
-        }
+        .vp { position:relative; isolation:isolate; }
+        .vp::after { content:''; position:absolute; inset:0; pointer-events:none;
+          -webkit-backdrop-filter:blur(0.001px); backdrop-filter:blur(0.001px); z-index:1; }
       `}</style>
 
-      {/* Blackout / Kick Countdown Overlay */}
+      {/* Kick overlay */}
       <AnimatePresence>
         {showBlackout && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="fixed inset-0 z-[200] bg-black flex flex-col items-center justify-center gap-6"
-          >
-            <div className="w-20 h-20 bg-red-600/10 border border-red-600/40 rounded-full flex items-center justify-center">
-              <AlertTriangle className="w-10 h-10 text-red-500" />
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+            className="fixed inset-0 z-[200] bg-[#1c1c1c] flex flex-col items-center justify-center gap-6">
+            <div className="w-20 h-20 bg-[#8d3030]/10 border border-[#8d3030]/30 rounded-full flex items-center justify-center">
+              <AlertTriangle className="w-10 h-10 text-[#8d3030]" />
             </div>
             <div className="text-center px-8">
-              <p className="text-white font-black text-2xl mb-2">Captura detectada</p>
-              <p className="text-slate-400 text-sm mb-1">Violación de políticas de privacidad</p>
-              <p className="text-slate-600 text-xs">Serás expulsado en</p>
+              <p className="text-white font-black text-2xl mb-2 tracking-tight">Captura detectada</p>
+              <p className="text-white/50 text-sm">Violación de políticas de privacidad</p>
+              <p className="text-white/30 text-xs mt-1">Serás expulsado en</p>
             </div>
-            <div className="w-20 h-20 rounded-full bg-red-600/10 border-2 border-red-500 flex items-center justify-center">
-              <span className="text-red-400 font-black text-4xl">{countdown}</span>
+            <div className="w-20 h-20 rounded-full bg-[#8d3030]/10 border-2 border-[#8d3030]/60 flex items-center justify-center">
+              <span className="text-[#8d3030] font-black text-4xl">{countdown}</span>
             </div>
-            <p className="text-slate-700 text-[10px] uppercase tracking-widest">EstudioAMA Security</p>
           </motion.div>
         )}
       </AnimatePresence>
 
       {/* Header */}
-      <header className="flex items-center justify-between px-4 md:px-8 py-4 md:py-6 mb-0 md:mb-2 flex-shrink-0">
-        <div className="flex items-center gap-3 md:gap-4">
-          <div className="w-8 h-8 md:w-10 md:h-10 bg-red-600 rounded-xl flex items-center justify-center font-bold text-white shadow-lg shadow-red-500/20 italic text-sm md:text-base">A</div>
-          <div>
-            <h1 className="text-base md:text-lg font-bold tracking-tight text-white">Estudio<span className="text-red-500">AMA</span></h1>
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
-              <p className="text-[9px] md:text-[10px] text-slate-500 uppercase tracking-widest font-semibold flex items-center gap-1 md:gap-2">
-                <Lock className="w-2 h-2 md:w-2.5 md:h-2.5" /> <span className="hidden sm:inline">CODE: </span>{roomName}
-              </p>
-            </div>
+      <header className="flex-shrink-0 flex items-center justify-between px-4 md:px-6 py-3 bg-[#fffefe] border-b border-[#1c1c1c]/8 shadow-sm">
+        <div className="flex items-center gap-3">
+          <img src="/logo/AMA.png" alt="AMA" className="h-7"
+            style={{ mixBlendMode: 'multiply' }}
+            onError={(e) => { e.currentTarget.style.display='none'; (e.currentTarget.nextElementSibling as HTMLElement|null)?.removeAttribute('hidden'); }} />
+          <span hidden className="font-black tracking-tighter text-lg leading-none">
+            <span className="text-[#1c1c1c]">ESTUDIO</span><span className="text-[#8d3030]">AMA</span>
+          </span>
+          <div className="h-4 w-px bg-[#1c1c1c]/12" />
+          <div className="flex items-center gap-1.5">
+            <Lock className="w-3 h-3 text-[#1c1c1c]/30" />
+            <span className="text-[9px] text-[#1c1c1c]/40 uppercase tracking-widest font-mono font-semibold">{roomName}</span>
           </div>
         </div>
-
-        <div className="flex items-center gap-2 md:gap-3">
-          <div className="hidden md:flex bg-slate-900/50 border border-slate-800 px-4 py-2 rounded-full items-center gap-3">
-            <Users className="w-4 h-4 text-slate-500" />
-            <span className="text-sm font-medium text-slate-200 uppercase tracking-tighter text-[10px]">Secure Mesh</span>
-          </div>
-          <div className="bg-red-500/10 border border-red-500/20 text-red-500 px-3 md:px-4 py-1.5 md:py-2 rounded-full flex items-center gap-1.5 md:gap-2">
-             <ShieldCheck className="w-3.5 h-3.5 md:w-4 md:h-4" />
-             <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-wider">AMA Encrypted</span>
+        <div className="flex items-center gap-2">
+          <div className="hidden sm:flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 px-2.5 py-1 rounded-full">
+            <ShieldCheck className="w-3 h-3" />
+            <span className="text-[9px] font-bold uppercase tracking-wider">Cifrado</span>
           </div>
         </div>
       </header>
 
-      {/* Desktop: Bento Grid */}
-      <main className="hidden md:grid flex-1 p-6 grid-cols-4 grid-rows-4 gap-4 overflow-hidden relative">
-        {/* Primary Stage */}
-        <div className="col-span-3 row-span-4 bg-slate-900 rounded-[32px] overflow-hidden border border-slate-800 relative shadow-2xl video-protected">
-           <TracksManager roomName={roomName} />
-        </div>
+      {/* Video area */}
+      <div className="flex-1 min-h-0 relative overflow-hidden">
+        <VideoArea roomName={roomName} />
 
-        {/* Security Insights */}
-        <div className="col-span-1 row-span-2 bg-[#1a1c20]/40 rounded-[32px] border border-slate-800 p-5 flex flex-col overflow-hidden">
-           <h3 className="text-[10px] font-bold uppercase text-slate-500 tracking-wider mb-4">Security Insights</h3>
-           <div className="flex-1 space-y-4">
-             <InsightCard
-               icon={<ShieldCheck className="w-4 h-4 text-emerald-500" />}
-               label="Forensics Data"
-               value="99.8%"
-               sub="Mesh Integrity"
-             />
-             <InsightCard
-               icon={<Lock className="w-4 h-4 text-red-500" />}
-               label="Encryption"
-               value="AES-256"
-               sub="Session Key Pair"
-             />
-           </div>
-        </div>
-
-        {/* Chat / Stats panel */}
-        <div className="col-span-1 row-span-2 overflow-hidden h-full">
-           <AnimatePresence mode="wait">
-             {showChat ? (
-                <motion.div
-                  key="chat"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  className="h-full"
-                >
-                  <Chat onClose={() => setShowChat(false)} />
-                </motion.div>
-             ) : (
-                <motion.div
-                  key="stats"
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="h-full bg-slate-900 font-mono text-[10px] p-5 rounded-[32px] border border-slate-800 flex flex-col justify-between"
-                >
-                  <div className="space-y-4">
-                    <p className="text-red-500 font-bold uppercase tracking-widest text-[8px]">Network Diagnostics</p>
-                    <div className="flex justify-between border-b border-slate-800 pb-2">
-                       <span className="text-slate-500">LATENCY</span>
-                       <span className="text-emerald-500">14ms</span>
-                    </div>
-                    <div className="flex justify-between border-b border-slate-800 pb-2">
-                       <span className="text-slate-500">PACKET LOSS</span>
-                       <span className="text-slate-200">0.00%</span>
-                    </div>
-                    <div className="flex justify-between">
-                       <span className="text-slate-500">BITRATE</span>
-                       <span className="text-slate-200">2.4 Mbps</span>
-                    </div>
-                  </div>
-                  <div className="p-3 bg-black/40 rounded-xl border border-red-500/10 text-red-400">
-                    EstudioAMA Secure Mesh Active
-                  </div>
-                </motion.div>
-             )}
-           </AnimatePresence>
-        </div>
-      </main>
-
-      {/* Mobile: Full-screen video */}
-      <main className="md:hidden flex-1 px-3 pb-2 overflow-hidden relative">
-        <div className="bg-slate-900 rounded-[20px] overflow-hidden border border-slate-800 h-full relative video-protected">
-          <TracksManager roomName={roomName} />
-        </div>
-
-        {/* Mobile Chat Bottom Sheet */}
+        {/* Chat desktop sidebar */}
         <AnimatePresence>
           {showChat && (
             <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-              className="absolute inset-x-3 bottom-0 h-[70%] z-50"
+              initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 28, stiffness: 280 }}
+              className="hidden md:block absolute top-0 right-0 bottom-0 w-72 z-40 p-3"
             >
               <Chat onClose={() => setShowChat(false)} />
             </motion.div>
           )}
         </AnimatePresence>
-      </main>
 
-      {/* Control Bar */}
-      <div className="p-3 md:p-6 flex-shrink-0">
+        {/* Chat mobile bottom sheet */}
+        <AnimatePresence>
+          {showChat && (
+            <motion.div
+              initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+              className="md:hidden absolute inset-x-0 bottom-0 h-[65%] z-40 p-2"
+            >
+              <Chat onClose={() => setShowChat(false)} />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Controls */}
+      <div className="flex-shrink-0 bg-[#fffefe] border-t border-[#1c1c1c]/8 px-3 py-2 md:px-5 md:py-3">
         <Controls
-          onToggleChat={() => setShowChat(!showChat)}
-          onToggleParticipants={() => setShowParticipants(!showParticipants)}
+          onToggleChat={() => setShowChat(v => !v)}
           showChat={showChat}
-          showParticipants={showParticipants}
+          isOrganizer={isOrganizer}
+          roomName={roomName}
         />
       </div>
+
+      <RoomAudioRenderer />
+      <ScreenShareAudioRenderer />
     </LiveKitRoom>
   );
 };
 
-const TracksManager = ({ roomName }: { roomName: string }) => {
-  const tracks = useTracks(
-    [
-      { source: Track.Source.Camera, withPlaceholder: false },
-      { source: Track.Source.ScreenShare, withPlaceholder: false },
-    ]
-  );
+// ── Video area: detecta screen share y cambia layout ─────────────────────────
+function VideoArea({ roomName }: { roomName: string }) {
+  const all = useTracks([
+    { source: Track.Source.Camera, withPlaceholder: false },
+    { source: Track.Source.ScreenShare, withPlaceholder: false },
+  ]);
+
+  const ssTracks  = all.filter(t => t.source === Track.Source.ScreenShare);
+  const camTracks = all.filter(t => t.source === Track.Source.Camera);
+  const hasScreen = ssTracks.length > 0;
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full p-2 md:p-0">
-      {tracks.map((track) => (
-        <TrackRefContext.Provider value={track} key={`${track.participant.identity}-${track.source}`}>
-          <ParticipantContext.Provider value={track.participant}>
-            <ParticipantTile roomName={roomName} />
+    <AnimatePresence mode="wait">
+      {hasScreen ? (
+        <motion.div key="screen" className="absolute inset-0"
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          transition={{ duration: 0.25 }}>
+          <ScreenShareLayout ss={ssTracks[0]} cams={camTracks} roomName={roomName} />
+        </motion.div>
+      ) : (
+        <motion.div key="cams" className="absolute inset-0"
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          transition={{ duration: 0.25 }}>
+          <CameraLayout cams={camTracks} roomName={roomName} />
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+// ── Layout con screen share activo ────────────────────────────────────────────
+function ScreenShareLayout({ ss, cams, roomName }: { ss: any; cams: any[]; roomName: string }) {
+  return (
+    // Mobile: columna — SS arriba, tira de cámaras abajo
+    // Desktop: fila — SS a la izquierda, tira vertical de cámaras a la derecha
+    <div className="h-full flex flex-col md:flex-row gap-2 p-2 md:p-3">
+      {/* Pantalla compartida principal */}
+      <div className="flex-1 min-h-0 min-w-0 vp rounded-[20px] md:rounded-[24px] overflow-hidden bg-black">
+        <TrackRefContext.Provider value={ss}>
+          <ParticipantContext.Provider value={ss.participant}>
+            <ParticipantTile roomName={roomName} variant="main" />
           </ParticipantContext.Provider>
         </TrackRefContext.Provider>
-      ))}
+      </div>
 
-      {tracks.length === 0 && (
-        <div className="col-span-full h-full flex flex-col items-center justify-center text-slate-600 animate-in fade-in zoom-in duration-700 px-4 text-center">
-           <div className="w-16 h-16 md:w-24 md:h-24 bg-[#050505] rounded-[24px] md:rounded-[32px] flex items-center justify-center mb-4 md:mb-6 ring-1 ring-slate-800 shadow-2xl">
-             <Users className="w-8 h-8 md:w-10 md:h-10 text-red-500" />
-           </div>
-           <p className="text-lg md:text-2xl font-bold text-white mb-2">Authenticated Connection Established</p>
-           <p className="text-xs md:text-sm opacity-60 font-mono tracking-widest uppercase">Waiting for session broadcast...</p>
+      {/* Tira de cámaras */}
+      {cams.length > 0 && (
+        // Mobile: barra horizontal scrollable, altura fija
+        // Desktop: franja vertical scrollable, ancho fijo
+        <div className={[
+          'flex-shrink-0 flex gap-2',
+          // Mobile: horizontal scroll
+          'flex-row overflow-x-auto overflow-y-hidden h-24',
+          // Desktop: vertical scroll
+          'md:flex-col md:overflow-y-auto md:overflow-x-hidden md:h-full md:w-36 md:h-auto',
+        ].join(' ')}
+          style={{ scrollbarWidth: 'none' }}
+        >
+          {cams.map(track => (
+            <div
+              key={`${track.participant.identity}-cam`}
+              className="flex-shrink-0 h-full aspect-video md:aspect-video md:w-full md:h-auto rounded-[14px] overflow-hidden bg-black"
+            >
+              <TrackRefContext.Provider value={track}>
+                <ParticipantContext.Provider value={track.participant}>
+                  <ParticipantTile roomName={roomName} variant="mini" />
+                </ParticipantContext.Provider>
+              </TrackRefContext.Provider>
+            </div>
+          ))}
         </div>
       )}
     </div>
   );
-};
+}
 
-function InsightCard({ icon, label, value, sub }: { icon: React.ReactNode, label: string, value: string, sub: string }) {
+// ── Layout solo cámaras ───────────────────────────────────────────────────────
+function CameraLayout({ cams, roomName }: { cams: any[]; roomName: string }) {
+  if (cams.length === 0) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center text-center px-6">
+        <div className="w-16 h-16 md:w-20 md:h-20 bg-[#1c1c1c]/5 rounded-[20px] flex items-center justify-center mb-5 ring-1 ring-[#1c1c1c]/8">
+          <Users className="w-8 h-8 text-[#8d3030]/50" />
+        </div>
+        <p className="text-base md:text-xl font-bold text-[#1c1c1c]/50 mb-2 tracking-tight">Conexión establecida</p>
+        <p className="text-xs text-[#1c1c1c]/25 font-mono tracking-widest uppercase">Esperando participantes...</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl flex flex-col gap-2">
-       <div className="flex items-center justify-between">
-         {icon}
-         <span className="text-xs font-mono font-bold text-white">{value}</span>
-       </div>
-       <div>
-         <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">{label}</p>
-         <p className="text-[9px] text-slate-600 italic">{sub}</p>
-       </div>
+    <div className={[
+      'h-full p-2 md:p-3',
+      // Mobile: columna vertical scrollable
+      'overflow-y-auto flex flex-col gap-2',
+      // Desktop: grid 2 columnas (o 1 si solo hay uno)
+      cams.length === 1
+        ? 'md:flex md:items-center md:justify-center'
+        : 'md:grid md:grid-cols-2 md:content-start',
+    ].join(' ')}
+      style={{ scrollbarWidth: 'none' }}
+    >
+      {cams.map(track => (
+        <div
+          key={`${track.participant.identity}-cam`}
+          className={[
+            'vp flex-shrink-0 rounded-[20px] md:rounded-[24px] overflow-hidden bg-black',
+            'w-full aspect-video',
+            cams.length === 1 ? 'md:max-w-3xl md:mx-auto' : '',
+          ].join(' ')}
+        >
+          <TrackRefContext.Provider value={track}>
+            <ParticipantContext.Provider value={track.participant}>
+              <ParticipantTile roomName={roomName} variant="main" />
+            </ParticipantContext.Provider>
+          </TrackRefContext.Provider>
+        </div>
+      ))}
     </div>
+  );
+}
+
+function ScreenShareAudioRenderer() {
+  const tracks = useTracks([{ source: Track.Source.ScreenShareAudio, withPlaceholder: false }]);
+  return (
+    <>
+      {tracks.map(t => (
+        <AudioTrack key={`${t.participant.identity}-ss-audio`} trackRef={t} />
+      ))}
+    </>
   );
 }
