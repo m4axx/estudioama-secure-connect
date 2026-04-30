@@ -92,6 +92,7 @@ export const Controls: React.FC<ControlsProps> = ({
                 <TrackToggle
                   source={Track.Source.ScreenShare}
                   showIcon={false}
+                  captureOptions={{ audio: true }}
                   className={cn(
                     buttonVariants({ variant: "ghost", size: "icon" }),
                     "rounded-xl w-9 h-9 md:w-10 md:h-10 border-none bg-transparent hidden md:flex",

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   LiveKitRoom,
   RoomAudioRenderer,
+  AudioTrack,
   useTracks,
   TrackRefContext,
   ParticipantContext
@@ -302,8 +303,10 @@ export const CallRoom: React.FC<CallRoomProps> = ({
         />
       </div>
 
-      {/* Reproduce automáticamente el audio de todos los participantes remotos */}
+      {/* Audio de micrófonos */}
       <RoomAudioRenderer />
+      {/* Audio de compartición de pantalla */}
+      <ScreenShareAudioRenderer />
     </LiveKitRoom>
   );
 };
@@ -336,6 +339,19 @@ const TracksManager = ({ roomName }: { roomName: string }) => {
     </div>
   );
 };
+
+function ScreenShareAudioRenderer() {
+  const tracks = useTracks([
+    { source: Track.Source.ScreenShareAudio, withPlaceholder: false },
+  ]);
+  return (
+    <>
+      {tracks.map((track) => (
+        <AudioTrack key={`${track.participant.identity}-screenshare-audio`} trackRef={track} />
+      ))}
+    </>
+  );
+}
 
 function InsightCard({ icon, label, value, sub }: { icon: React.ReactNode, label: string, value: string, sub: string }) {
   return (
