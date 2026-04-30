@@ -1,7 +1,5 @@
 import React from 'react';
 import {
-  ParticipantContext,
-  TrackRefContext,
   VideoTrack,
   useParticipantContext,
   useTrackRefContext
@@ -12,43 +10,51 @@ import { cn } from '@/lib/utils';
 
 interface ParticipantTileProps {
   roomName: string;
+  /** main = full overlay; mini = compact badge only */
+  variant?: 'main' | 'mini';
 }
 
-export const ParticipantTile: React.FC<ParticipantTileProps> = ({ roomName }) => {
+export const ParticipantTile: React.FC<ParticipantTileProps> = ({ roomName, variant = 'main' }) => {
   const p = useParticipantContext();
   const trackRef = useTrackRefContext();
-
   const isScreenShare = trackRef.source === Track.Source.ScreenShare;
+  const isMini = variant === 'mini';
 
   return (
-    <div className={cn(
-      "relative group aspect-video bg-[#111] rounded-[24px] overflow-hidden border border-white/5 transition-all hover:border-[#8d3030]/40 flex items-center justify-center",
-      isScreenShare && "col-span-full h-full"
-    )}>
-      <VideoTrack
-        trackRef={trackRef}
-        className="w-full h-full object-cover"
-      />
+    <div className="relative w-full h-full flex items-center justify-center bg-black">
+      <VideoTrack trackRef={trackRef} className="w-full h-full object-cover" />
 
-      {(trackRef.source === Track.Source.Camera || isScreenShare) && (
+      {/* Watermark solo en main */}
+      {!isMini && (trackRef.source === Track.Source.Camera || isScreenShare) && (
         <Watermark username={p.identity} roomName={roomName} />
       )}
 
-      {/* Etiqueta del participante */}
-      <div className="absolute bottom-3 left-3 md:bottom-4 md:left-4 bg-black/50 backdrop-blur-md px-2.5 py-1.5 rounded-xl border border-white/8 flex items-center gap-2 shadow-lg">
-        <div className={cn("w-1.5 h-1.5 rounded-full", p.isMicrophoneEnabled ? "bg-emerald-400" : "bg-[#8d3030]")} />
-        <span className="text-[10px] font-bold text-white truncate max-w-[100px] md:max-w-[130px]">
-          {p.identity}{p.isLocal && " (Tú)"}
+      {/* Badge de participante */}
+      <div className={cn(
+        'absolute left-2 bottom-2 bg-black/50 backdrop-blur-md rounded-xl border border-white/8 flex items-center gap-1.5 shadow',
+        isMini ? 'px-1.5 py-1' : 'px-2.5 py-1.5 md:left-4 md:bottom-4'
+      )}>
+        <div className={cn(
+          'rounded-full flex-shrink-0',
+          isMini ? 'w-1.5 h-1.5' : 'w-2 h-2',
+          p.isMicrophoneEnabled ? 'bg-emerald-400' : 'bg-[#8d3030]'
+        )} />
+        <span className={cn(
+          'font-bold text-white truncate',
+          isMini ? 'text-[9px] max-w-[60px]' : 'text-[10px] max-w-[110px] md:max-w-[140px]'
+        )}>
+          {p.identity}{p.isLocal && !isMini ? ' (Tú)' : ''}
         </span>
-        {isScreenShare && (
+        {isScreenShare && !isMini && (
           <span className="text-[8px] font-black uppercase tracking-widest text-[#8d3030]/80 border-l border-white/10 pl-2">
             Pantalla
           </span>
         )}
       </div>
 
-      {isScreenShare && (
-        <div className="absolute top-3 left-3 right-3 md:top-4 md:left-4 md:right-4 p-2.5 bg-[#8d3030]/10 backdrop-blur-md rounded-xl border border-[#8d3030]/20 text-[9px] text-white/70 uppercase tracking-widest font-bold">
+      {/* Aviso screen share — solo en main */}
+      {isScreenShare && !isMini && (
+        <div className="absolute top-3 left-3 right-3 p-2 bg-[#8d3030]/10 backdrop-blur-md rounded-xl border border-[#8d3030]/20 text-[9px] text-white/70 uppercase tracking-widest font-bold">
           Transmisión restringida — Marca forense activa
         </div>
       )}

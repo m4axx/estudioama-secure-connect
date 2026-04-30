@@ -1,43 +1,30 @@
 import React, { useState, useCallback } from 'react';
-import {
-  DisconnectButton,
-  TrackToggle,
-  useLocalParticipant
-} from '@livekit/components-react';
+import { DisconnectButton, TrackToggle, useLocalParticipant } from '@livekit/components-react';
 import { Track } from 'livekit-client';
-import {
-  Mic, MicOff,
-  Video, VideoOff,
-  Monitor,
-  MessageSquare,
-  Maximize, Minimize,
-  Circle, StopCircle
-} from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, Monitor, MessageSquare, Maximize, Minimize, Circle, StopCircle } from 'lucide-react';
 import { Button, buttonVariants } from './ui/button';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger
-} from './ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 import { cn } from '@/lib/utils';
 import { useRoomRecording } from '@/hooks/useRoomRecording';
 
 interface ControlsProps {
   onToggleChat: () => void;
-  onToggleParticipants: () => void;
   showChat: boolean;
-  showParticipants: boolean;
   isOrganizer: boolean;
   roomName: string;
+  // legacy prop — not used but kept for compatibility
+  onToggleParticipants?: () => void;
+  showParticipants?: boolean;
 }
 
-export const Controls: React.FC<ControlsProps> = ({
-  onToggleChat,
-  showChat,
-  isOrganizer,
-  roomName,
-}) => {
+const BTN = 'rounded-2xl flex items-center justify-center transition-all active:scale-95 border';
+// Mobile: 52×52px touch target. Desktop: 44×44px.
+const SIZE = 'w-13 h-13 md:w-11 md:h-11';
+const IDLE = 'bg-[#f8f5f0] border-[#1c1c1c]/10 text-[#1c1c1c]/60 hover:bg-[#1c1c1c]/6 hover:text-[#1c1c1c]';
+const ACTIVE = 'bg-[#8d3030]/8 text-[#8d3030] border-[#8d3030]/20';
+const ICON = 'w-5 h-5 md:w-5 md:h-5';
+
+export const Controls: React.FC<ControlsProps> = ({ onToggleChat, showChat, isOrganizer, roomName }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const { recording, duration, startRecording, stopRecording } = useRoomRecording(roomName);
 
@@ -50,42 +37,35 @@ export const Controls: React.FC<ControlsProps> = ({
   }, []);
 
   React.useEffect(() => {
-    const handler = () => setIsFullscreen(!!document.fullscreenElement);
-    document.addEventListener('fullscreenchange', handler);
-    return () => document.removeEventListener('fullscreenchange', handler);
+    const h = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', h);
+    return () => document.removeEventListener('fullscreenchange', h);
   }, []);
 
   return (
     <TooltipProvider>
-      <div className="bg-[#fffefe] border border-[#1c1c1c]/10 rounded-[32px] px-5 md:px-8 py-3 md:py-4 flex items-center justify-between shadow-sm">
+      <div className="flex items-center justify-between gap-2">
 
-        {/* Micrófono y cámara */}
-        <div className="flex gap-4 md:gap-5">
-          <ControlButton Icon={Mic} ActiveIcon={MicOff} label="Micrófono" source={Track.Source.Microphone} />
-          <ControlButton Icon={Video} ActiveIcon={VideoOff} label="Cámara" source={Track.Source.Camera} />
+        {/* Izquierda: mic + cam */}
+        <div className="flex items-center gap-2 md:gap-3">
+          <TrackBtn Icon={Mic} OffIcon={MicOff} source={Track.Source.Microphone} label="Micrófono" />
+          <TrackBtn Icon={Video} OffIcon={VideoOff} source={Track.Source.Camera} label="Cámara" />
         </div>
 
-        {/* Controles secundarios */}
-        <div className="flex gap-1.5 md:gap-2 items-center bg-[#f8f5f0] px-3 md:px-4 py-2 rounded-2xl border border-[#1c1c1c]/8">
-
+        {/* Centro: controles secundarios */}
+        <div className="flex items-center gap-1.5 md:gap-2 bg-[#f8f5f0] px-2.5 py-1.5 rounded-2xl border border-[#1c1c1c]/8">
           {/* Chat */}
           <Tooltip>
             <TooltipTrigger
-              className={cn(
-                buttonVariants({ variant: "ghost", size: "icon" }),
-                "rounded-xl w-9 h-9 md:w-10 md:h-10 transition-all",
-                showChat
-                  ? "bg-[#8d3030]/10 text-[#8d3030]"
-                  : "text-[#1c1c1c]/40 hover:text-[#1c1c1c] hover:bg-[#1c1c1c]/6"
-              )}
               onClick={onToggleChat}
+              className={cn(BTN, SIZE, showChat ? ACTIVE : IDLE)}
             >
-              <MessageSquare className="w-4 h-4 md:w-5 md:h-5" />
+              <MessageSquare className={ICON} />
             </TooltipTrigger>
-            <TooltipContent>Chat de sesión</TooltipContent>
+            <TooltipContent>Chat</TooltipContent>
           </Tooltip>
 
-          {/* Compartir pantalla */}
+          {/* Compartir pantalla (desktop) */}
           <Tooltip>
             <TooltipTrigger
               render={
@@ -93,15 +73,11 @@ export const Controls: React.FC<ControlsProps> = ({
                   source={Track.Source.ScreenShare}
                   showIcon={false}
                   captureOptions={{ audio: true }}
-                  className={cn(
-                    buttonVariants({ variant: "ghost", size: "icon" }),
-                    "rounded-xl w-9 h-9 md:w-10 md:h-10 border-none bg-transparent hidden md:flex",
-                    "text-[#1c1c1c]/40 hover:text-[#1c1c1c] hover:bg-[#1c1c1c]/6"
-                  )}
+                  className={cn(BTN, SIZE, IDLE, 'hidden md:flex border-none bg-transparent')}
                 />
               }
             >
-              <Monitor className="w-4 h-4 md:w-5 md:h-5" />
+              <Monitor className={ICON} />
             </TooltipTrigger>
             <TooltipContent>Compartir pantalla</TooltipContent>
           </Tooltip>
@@ -109,86 +85,63 @@ export const Controls: React.FC<ControlsProps> = ({
           {/* Pantalla completa */}
           <Tooltip>
             <TooltipTrigger
-              className={cn(
-                buttonVariants({ variant: "ghost", size: "icon" }),
-                "rounded-xl w-9 h-9 md:w-10 md:h-10 transition-all",
-                "text-[#1c1c1c]/40 hover:text-[#1c1c1c] hover:bg-[#1c1c1c]/6"
-              )}
               onClick={toggleFullscreen}
+              className={cn(BTN, SIZE, IDLE)}
             >
-              {isFullscreen
-                ? <Minimize className="w-4 h-4 md:w-5 md:h-5" />
-                : <Maximize className="w-4 h-4 md:w-5 md:h-5" />
-              }
+              {isFullscreen ? <Minimize className={ICON} /> : <Maximize className={ICON} />}
             </TooltipTrigger>
-            <TooltipContent>{isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}</TooltipContent>
+            <TooltipContent>{isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}</TooltipContent>
           </Tooltip>
 
-          {/* Grabación — solo visible para el organizador */}
+          {/* Grabación (solo organizador) */}
           {isOrganizer && (
             <Tooltip>
               <TooltipTrigger
-                className={cn(
-                  buttonVariants({ variant: "ghost", size: "icon" }),
-                  "rounded-xl w-9 h-9 md:w-10 md:h-10 transition-all",
-                  recording
-                    ? "bg-[#8d3030]/10 text-[#8d3030] hover:bg-[#8d3030]/15"
-                    : "text-[#1c1c1c]/40 hover:text-[#1c1c1c] hover:bg-[#1c1c1c]/6"
-                )}
                 onClick={recording ? stopRecording : startRecording}
+                className={cn(BTN, SIZE, recording ? ACTIVE : IDLE)}
               >
-                {recording
-                  ? <StopCircle className="w-4 h-4 md:w-5 md:h-5" />
-                  : <Circle className="w-4 h-4 md:w-5 md:h-5" />
-                }
+                {recording ? <StopCircle className={ICON} /> : <Circle className={ICON} />}
               </TooltipTrigger>
-              <TooltipContent>
-                {recording ? `Detener grabación (${duration})` : "Iniciar grabación"}
-              </TooltipContent>
+              <TooltipContent>{recording ? `Detener (${duration})` : 'Grabar sesión'}</TooltipContent>
             </Tooltip>
           )}
         </div>
 
-        {/* Estado + indicador de grabación + salir */}
-        <div className="flex items-center gap-3 md:gap-5">
+        {/* Derecha: estado + salir */}
+        <div className="flex items-center gap-2 md:gap-4">
           {recording ? (
-            <div className="hidden sm:flex items-center gap-2">
+            <div className="hidden sm:flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-[#8d3030] animate-pulse" />
-              <span className="text-xs font-mono font-bold text-[#8d3030] uppercase tracking-widest">
-                {duration}
-              </span>
+              <span className="text-xs font-mono font-bold text-[#8d3030] tabular-nums">{duration}</span>
             </div>
           ) : (
-            <div className="text-right hidden sm:block">
+            <div className="text-right hidden lg:block">
               <p className="text-[9px] text-[#1c1c1c]/35 font-bold uppercase tracking-widest">Estado</p>
-              <p className="text-xs font-mono text-emerald-600 uppercase font-black">Seguro</p>
+              <p className="text-xs font-mono text-emerald-600 font-black uppercase">Seguro</p>
             </div>
           )}
 
-          <DisconnectButton
-            className={cn(
-              buttonVariants({ variant: "default" }),
-              "px-5 md:px-7 py-2.5 bg-[#8d3030] hover:bg-[#7a2828] text-white rounded-xl font-bold text-xs uppercase tracking-widest transition-all shadow-md shadow-[#8d3030]/15 active:scale-95 border-none h-auto"
-            )}
-          >
-            <span className="hidden sm:inline">Salir de la sesión</span>
-            <span className="sm:hidden">Salir</span>
+          <DisconnectButton className={cn(
+            buttonVariants({ variant: 'default' }),
+            'h-13 md:h-11 px-4 md:px-6 bg-[#8d3030] hover:bg-[#7a2828] text-white rounded-2xl',
+            'font-bold text-xs uppercase tracking-widest border-none shadow-md shadow-[#8d3030]/15 active:scale-95'
+          )}>
+            <span className="hidden sm:inline">Salir</span>
+            <span className="sm:hidden text-sm">✕</span>
           </DisconnectButton>
         </div>
-
       </div>
     </TooltipProvider>
   );
 };
 
-function ControlButton({ Icon, ActiveIcon, label, source }: {
-  Icon: React.ElementType;
-  ActiveIcon: React.ElementType;
-  label: string;
-  source: Track.Source;
+// ── Botón de pista con toggle ─────────────────────────────────────────────────
+function TrackBtn({ Icon, OffIcon, source, label }: {
+  Icon: React.ElementType; OffIcon: React.ElementType;
+  source: Track.Source; label: string;
 }) {
   return (
-    <div className="flex flex-col items-center gap-1">
+    <div className="flex flex-col items-center gap-0.5">
       <Tooltip>
         <TooltipTrigger
           render={
@@ -196,31 +149,26 @@ function ControlButton({ Icon, ActiveIcon, label, source }: {
               source={source}
               showIcon={false}
               className={cn(
-                "w-11 h-11 md:w-12 md:h-12 rounded-2xl transition-all border flex items-center justify-center",
-                "bg-[#f8f5f0] border-[#1c1c1c]/10 text-[#1c1c1c]/60 hover:bg-[#1c1c1c]/6 hover:text-[#1c1c1c]",
-                "aria-[pressed=true]:bg-[#8d3030]/8 aria-[pressed=true]:text-[#8d3030] aria-[pressed=true]:border-[#8d3030]/20"
+                BTN, SIZE,
+                'bg-[#f8f5f0] border-[#1c1c1c]/10 text-[#1c1c1c]/60',
+                'hover:bg-[#1c1c1c]/6 hover:text-[#1c1c1c]',
+                'aria-[pressed=true]:bg-[#8d3030]/8 aria-[pressed=true]:text-[#8d3030] aria-[pressed=true]:border-[#8d3030]/20'
               )}
             />
           }
         >
-          <TrackStatusIcon Icon={Icon} ActiveIcon={ActiveIcon} source={source} />
+          <TrackIcon Icon={Icon} OffIcon={OffIcon} source={source} />
         </TooltipTrigger>
         <TooltipContent>{label}</TooltipContent>
       </Tooltip>
-      <span className="text-[8px] font-bold text-[#1c1c1c]/30 uppercase tracking-tighter hidden md:block">
-        {label}
-      </span>
+      <span className="text-[8px] font-bold text-[#1c1c1c]/30 uppercase tracking-tighter hidden md:block">{label}</span>
     </div>
   );
 }
 
-function TrackStatusIcon({ Icon, ActiveIcon, source }: {
-  Icon: React.ElementType;
-  ActiveIcon: React.ElementType;
-  source: Track.Source;
-}) {
+function TrackIcon({ Icon, OffIcon, source }: { Icon: React.ElementType; OffIcon: React.ElementType; source: Track.Source }) {
   const { isMicrophoneEnabled, isCameraEnabled } = useLocalParticipant();
-  const enabled = source === Track.Source.Microphone ? isMicrophoneEnabled : isCameraEnabled;
-  const CurrentIcon = enabled ? Icon : ActiveIcon;
-  return <CurrentIcon className="w-5 h-5" />;
+  const on = source === Track.Source.Microphone ? isMicrophoneEnabled : isCameraEnabled;
+  const I = on ? Icon : OffIcon;
+  return <I className={ICON} />;
 }
